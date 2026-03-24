@@ -1,0 +1,235 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+  background: #f5f7fb;
+  color: #1f2937;
+}
+
+#system {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background: #fff;
+  padding: 12px;
+  border: 1px solid #d0d7e2;
+  border-radius: 10px;
+  width: 200px;
+  font-size: 13px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+h1,
+h2,
+h3 {
+  color: #111827;
+}
+
+form,
+.utility-card,
+.crypto-shell,
+.result,
+#queue,
+#progress {
+  background: #fff;
+  border: 1px solid #d0d7e2;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
+form,
+.utility-card,
+#queue,
+#progress,
+#results {
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+input,
+textarea,
+button {
+  font: inherit;
+}
+
+input[type="file"],
+input[type="number"],
+input[type="text"],
+textarea {
+  width: 100%;
+  max-width: 720px;
+  padding: 10px 12px;
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  box-sizing: border-box;
+  margin-top: 6px;
+}
+
+button,
+.utility-link,
+.primary-btn,
+.secondary-btn,
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 16px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+button:hover,
+.utility-link:hover,
+.primary-btn:hover,
+.secondary-btn:hover,
+.icon-btn:hover {
+  background: #1d4ed8;
+}
+
+.secondary-btn {
+  background: #475569;
+}
+
+.secondary-btn:hover {
+  background: #334155;
+}
+
+.icon-btn {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 24px;
+}
+
+.utility-card p {
+  margin-top: 0;
+}
+
+#logs {
+  background: #111;
+  color: #0f0;
+  padding: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+  border-radius: 12px;
+}
+
+.log-block {
+  margin-bottom: 10px;
+}
+
+.result {
+  padding: 10px;
+  margin: 10px 0;
+}
+
+.success {
+  color: #15803d;
+}
+
+.failed {
+  color: #dc2626;
+}
+
+.crypto-page {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%);
+}
+
+.crypto-shell {
+  max-width: 1100px;
+  margin: 32px auto;
+  padding: 28px;
+}
+
+.crypto-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.crypto-panel {
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  background: #fff;
+  padding: 20px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.field-row {
+  border: 1px solid #dbe4f0;
+  border-radius: 12px;
+  padding: 14px;
+  background: #f8fafc;
+}
+
+.field-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.field-row-title {
+  font-weight: 700;
+}
+
+.remove-btn {
+  background: #ef4444;
+}
+
+.remove-btn:hover {
+  background: #dc2626;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.result-box {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #0f172a;
+  color: #f8fafc;
+  min-height: 70px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.helper-text {
+  color: #475569;
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  #system {
+    position: static;
+    width: auto;
+    margin-bottom: 16px;
+  }
+}

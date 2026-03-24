@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>API Runner</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<!-- 🔥 SYSTEM PANEL -->
+<div id="system"></div>
+
+<h1>API Test Runner</h1>
+
+<section class="utility-card">
+  <h3>API Encryption / Decryption Utility</h3>
+  <p>Open a dedicated page to encrypt or decrypt multiple values with a shared passphrase.</p>
+  <a class="utility-link" href="/crypto.html" target="_blank" rel="noopener noreferrer">Open Utility in New Tab</a>
+</section>
+
+<form id="form">
+
+  <label><b>Collection:</b></label><br>
+  <input type="file" name="collection" required><br><br>
+
+  <label><b>Test Data Files:</b></label><br>
+  <input type="file" name="dataFiles" multiple required><br><br>
+
+  <!-- 🔥 NEW: PARALLEL INPUT -->
+  <label><b>Parallel Runs:</b></label><br>
+  <input type="number" id="parallel" value="7" min="1" max="20"><br><br>
+
+  <button type="submit">Run Tests</button>
+</form>
+
+<h3>Progress</h3>
+<div id="progress">Idle</div>
+
+<h3>Queue Status</h3>
+<div id="queue"></div>
+
+<h3>Results</h3>
+<div id="results"></div>
+
+<h3>Logs</h3>
+<div id="logs"></div>
+
+<script src="app.js"></script>
+
+</body>
+</html>
