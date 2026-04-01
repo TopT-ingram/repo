@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Postman Collection Runner</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .postman-layout {
+      display: flex;
+      height: calc(100vh - 100px);
+    }
+    .left-pane {
+      width: 300px;
+      border-right: 1px solid #d0d7e2;
+      padding: 10px;
+      overflow-y: auto;
+    }
+    .right-pane {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+    }
+    .request-item {
+      padding: 5px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .request-item:hover {
+      background: #f0f0f0;
+    }
+    .request-item.selected {
+      background: #e3f2fd;
+    }
+    .folder-item {
+      font-weight: bold;
+    }
+    .request-editor {
+      display: none;
+    }
+    .request-editor.active {
+      display: block;
+    }
+    .tab {
+      display: inline-block;
+      padding: 10px;
+      cursor: pointer;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+    }
+    .tab.active {
+      background: #fff;
+      border-bottom: 1px solid #fff;
+    }
+    .tab-content {
+      display: none;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-top: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .response-view {
+      margin-top: 10px;
+    }
+    .response-textarea {
+      width: 100%;
+      height: 200px;
+      font-family: monospace;
+      font-size: 12px;
+      border: 1px solid #ddd;
+      padding: 8px;
+      resize: vertical;
+    }
+  </style>
+</head>
+<body>
+  <h1>Postman Collection Runner</h1>
+
+  <div class="utility-card">
+    <p>Upload a Postman collection and Excel/JSON iteration data. Select requests to edit and run.</p>
+    <a class="utility-link" href="/" target="_self">Back to API Test Runner</a>
+  </div>
+
+  <form id="collection-form">
+    <label><b>Postman Collection JSON</b></label><br>
+    <input type="file" id="collection-file" accept="application/json" required /><br><br>
+
+    <label><b>Iteration Data (Excel, CSV, or JSON)</b></label><br>
+    <input type="file" id="data-file" name="dataFile" accept=".xlsx,.xls,.csv,.json" /><br><br>
+  </form>
+
+  <div class="postman-layout">
+    <div class="left-pane">
+      <h3>Collections</h3>
+      <button id="run-selected" style="margin-bottom: 10px;">Run Selected Requests</button>
+      <div style="margin-bottom: 10px;">
+        <button id="select-all">Select All</button>
+        <button id="unselect-all">Unselect All</button>
+      </div>
+      <div id="tree-container"></div>
+    </div>
+    <div class="right-pane">
+      <div id="request-editor" class="request-editor">
+        <div class="request-line" style="display: flex; gap: 10px; margin-bottom: 10px;">
+          <select id="method">
+            <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
+          </select>
+          <input type="text" id="url" placeholder="Enter request URL" style="flex: 1;">
+          <button id="send-request">Send</button>
+        </div>
+        <div class="tabs">
+          <div class="tab active" data-tab="params">Params</div>
+          <div class="tab" data-tab="auth">Authorization</div>
+          <div class="tab" data-tab="headers">Headers</div>
+          <div class="tab" data-tab="body">Body</div>
+          <div class="tab" data-tab="pre-request">Pre-request Script</div>
+          <div class="tab" data-tab="tests">Tests</div>
+        </div>
+        <div id="tab-content">
+          <div class="tab-content active" id="params-tab">
+            <h4>Query Params</h4>
+            <div id="query-params"></div>
+            <h4>Path Variables</h4>
+            <div id="path-vars"></div>
+          </div>
+          <div class="tab-content" id="auth-tab">
+            <select id="auth-type">
+              <option value="none">No Auth</option>
+              <option value="basic">Basic Auth</option>
+              <option value="bearer">Bearer Token</option>
+              <option value="apikey">API Key</option>
+            </select>
+            <div id="auth-fields"></div>
+          </div>
+          <div class="tab-content" id="headers-tab">
+            <div id="headers-list"></div>
+            <button type="button" id="add-header">Add Header</button>
+          </div>
+          <div class="tab-content" id="body-tab">
+            <select id="body-type">
+              <option value="none">None</option>
+              <option value="form-data">Form-data</option>
+              <option value="x-www-form-urlencoded">x-www-form-urlencoded</option>
+              <option value="raw">Raw</option>
+              <option value="binary">Binary</option>
+            </select>
+            <div id="body-content"></div>
+          </div>
+          <div class="tab-content" id="pre-request-tab">
+            <textarea id="pre-request-script" rows="10" style="width: 100%;"></textarea>
+          </div>
+          <div class="tab-content" id="tests-tab">
+            <textarea id="tests-script" rows="10" style="width: 100%;"></textarea>
+          </div>
+        </div>
+      </div>
+      <div id="run-results" class="request-editor">
+        <h3>Run Results</h3>
+        <div id="results-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="collection.js"></script>
+</body>
+</html>

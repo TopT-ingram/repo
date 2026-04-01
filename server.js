@@ -4,6 +4,7 @@ const newman = require('newman');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const XLSX = require('xlsx');
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
@@ -41,6 +42,57 @@ function getReportBaseName(originalName) {
   return path.parse(originalName).name
     .trim()
     .replace(/[\\/:*?"<>|]+/g, '_');
+}
+
+function flattenCollectionItems(items, prefix = []) {
+  const result = [];
+
+  items.forEach((item, idx) => {
+    const id = [...prefix, idx].join('.');
+
+    if (item.item && Array.isArray(item.item)) {
+      result.push({
+        id,
+        name: item.name || 'Folder',
+        type: 'folder',
+        item
+      });
+      result.push(...flattenCollectionItems(item.item, [...prefix, idx]));
+    } else {
+      result.push({
+        id,
+        name: item.name || 'Request',
+        type: 'request',
+        method: item.request?.method || 'GET',
+        url: (item.request?.url && (item.request.url.raw || item.request.url)) || '',
+        item
+      });
+    }
+  });
+
+  return result;
+}
+
+function buildSubsetItems(items, selectedIds, prefix = []) {
+  const filtered = [];
+
+  items.forEach((item, idx) => {
+    const id = [...prefix, idx].join('.');
+
+    if (item.item && Array.isArray(item.item)) {
+      const children = buildSubsetItems(item.item, selectedIds, [...prefix, idx]);
+      if (children.length > 0) {
+        const copy = { ...item, item: children };
+        filtered.push(copy);
+      }
+    } else {
+      if (selectedIds.includes(id)) {
+        filtered.push(item);
+      }
+    }
+  });
+
+  return filtered;
 }
 
 function createFallbackReport(reportPath, details) {
@@ -90,6 +142,44 @@ function getAssertionStats(summary) {
   };
 }
 
+function parseIterationData(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+
+  if (ext === '.xlsx' || ext === '.xls') {
+    const workbook = XLSX.readFile(filePath);
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    return XLSX.utils.sheet_to_json(sheet);
+  }
+
+  const fileText = fs.readFileSync(filePath, 'utf-8').trim();
+
+  if (ext === '.csv') {
+    const workbook = XLSX.read(fileText, { type: 'string' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    return XLSX.utils.sheet_to_json(sheet);
+  }
+
+  if (ext === '.json') {
+    return JSON.parse(fileText);
+  }
+
+  // Best-effort fallback: try JSON then CSV.
+  try {
+    return JSON.parse(fileText);
+  } catch (jsonError) {
+    try {
+      const workbook = XLSX.read(fileText, { type: 'string' });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      return XLSX.utils.sheet_to_json(sheet);
+    } catch (xlsError) {
+      throw new Error(`Unsupported iteration data format${ext ? ` (${ext})` : ''}. JSON error: ${jsonError.message}; CSV/XLSX error: ${xlsError.message}`);
+    }
+  }
+}
+
 function safeDeleteFile(filePath) {
   if (!filePath) {
     return;
@@ -99,8 +189,8 @@ function safeDeleteFile(filePath) {
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
-  } catch (error) {
-    console.error(`Failed to delete temp file: ${filePath}`, error.message);
+  } catch (err) {
+    console.warn(`safeDeleteFile failed for ${filePath}:`, err.message);
   }
 }
 
@@ -273,6 +363,95 @@ app.post('/run', upload.fields([
     cleanupUploadedFiles([
       ...(req.files?.collection || []),
       ...(req.files?.dataFiles || [])
+    ]);
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/run-selected', upload.fields([
+  { name: 'collection', maxCount: 1 },
+  { name: 'dataFile', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    if (!req.files || !req.files['collection']) {
+      return res.status(400).json({ error: 'Collection required' });
+    }
+
+    const selectedIds = req.body.selectedIds ? JSON.parse(req.body.selectedIds) : [];
+    if (!Array.isArray(selectedIds) || selectedIds.length === 0) {
+      return res.status(400).json({ error: 'No request IDs selected' });
+    }
+
+    const collectionPath = req.files['collection'][0].path;
+    const collectionData = JSON.parse(fs.readFileSync(collectionPath, 'utf-8'));
+    safeDeleteFile(collectionPath);
+
+    const subsetItems = buildSubsetItems(collectionData.item || [], selectedIds);
+    if (subsetItems.length === 0) {
+      return res.status(400).json({ error: 'No matching selected requests found in collection' });
+    }
+
+    const runCollection = {
+      ...collectionData,
+      item: subsetItems
+    };
+
+    let iterationDataPath;
+    let iterationData;
+    if (req.files['dataFile'] && req.files['dataFile'][0]) {
+      iterationDataPath = req.files['dataFile'][0].path;
+      iterationData = parseIterationData(iterationDataPath);
+    }
+
+    const requestResults = [];
+
+    newman.run({
+      collection: runCollection,
+      iterationData: iterationData,
+      timeoutRequest: NEWMAN_REQUEST_TIMEOUT,
+      timeoutScript: NEWMAN_SCRIPT_TIMEOUT,
+      timeout: NEWMAN_RUN_TIMEOUT,
+      reporters: ['cli']
+    })
+    .on('request', (err, args) => {
+      if (err) {
+        return;
+      }
+
+      const responseBody = args.response?.stream
+        ? args.response.stream.toString('utf8')
+        : args.response?.body || '';
+
+      requestResults.push({
+        name: args.item?.name || 'Unknown',
+        method: args.request?.method || 'N/A',
+        url: args.request?.url && args.request.url.toString ? args.request.url.toString() : '',
+        status: args.response?.status || 'N/A',
+        code: args.response?.code || 'N/A',
+        body: typeof responseBody === 'string' ? responseBody.substring(0, 16000) : '',
+        assertionCount: args.response ? args.response.responseTime || 0 : 0
+      });
+    })
+    .on('done', (err, summary) => {
+      if (iterationDataPath) safeDeleteFile(iterationDataPath);
+
+      const { total, failed, passed } = getAssertionStats(summary);
+      const status = err || failed > 0 ? 'failed' : 'success';
+      return res.json({
+        status,
+        total,
+        failed,
+        passed,
+        requestResults,
+        error: err?.message
+      });
+    });
+
+  } catch (err) {
+    cleanupUploadedFiles([
+      ...(req.files?.collection || []),
+      ...(req.files?.dataFile || [])
     ]);
     console.error(err);
     res.status(500).json({ error: err.message });
