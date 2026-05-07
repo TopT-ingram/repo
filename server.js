@@ -275,6 +275,7 @@ app.post('/run', upload.fields([
           timeoutRequest: NEWMAN_REQUEST_TIMEOUT,
           timeoutScript: NEWMAN_SCRIPT_TIMEOUT,
           timeout: NEWMAN_RUN_TIMEOUT,
+          insecure: true,
           reporters: ['cli', 'htmlextra'],
           reporter: {
             htmlextra: {
@@ -412,6 +413,7 @@ app.post('/run-selected', upload.fields([
       timeoutRequest: NEWMAN_REQUEST_TIMEOUT,
       timeoutScript: NEWMAN_SCRIPT_TIMEOUT,
       timeout: NEWMAN_RUN_TIMEOUT,
+      insecure: true,
       reporters: ['cli']
     })
     .on('request', (err, args) => {
