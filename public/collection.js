@@ -192,24 +192,118 @@ document.getElementById('run-selected').addEventListener('click', async () => {
       return;
     }
 
-    resultsList.innerHTML = '';
-    data.requestResults.forEach(result => {
-      const div = document.createElement('div');
-      div.className = 'response-view';
-      div.innerHTML = `
-        <h4>${result.method} ${result.name}</h4>
-        <p><strong>URL:</strong> ${result.url}</p>
-        <p><strong>Status:</strong> ${result.status} (${result.code})</p>
-        <label><strong>Response Body:</strong></label><br>
-        <textarea class="response-textarea" readonly>${result.body}</textarea>
-      `;
-      resultsList.appendChild(div);
-    });
+    // Generate manifest/extent report
+    const hasIterationData = dataFile.files[0];
+    const report = generateManifestReport(selectedIds, data.requestResults, hasIterationData, data.reportUrl);
+    
+    resultsList.innerHTML = report.html;
+    
+    // Store report data for download
+    resultsList.dataset.reportData = JSON.stringify(report.data);
 
   } catch (err) {
     resultsList.innerHTML = `Error: ${err.message}`;
   }
 });
+
+// Generate Manifest/Extent Report
+function generateManifestReport(selectedIds, results, hasIterationData, reportUrl) {
+  const totalRequests = selectedIds.length;
+  const successCount = results.filter(r => r.code >= 200 && r.code < 300).length;
+  const failureCount = results.filter(r => r.code >= 400).length;
+  const warningCount = results.filter(r => r.code >= 300 && r.code < 400).length;
+
+  const reportData = {
+    timestamp: new Date().toISOString(),
+    totalRequests: totalRequests,
+    successCount: successCount,
+    failureCount: failureCount,
+    warningCount: warningCount,
+    hasIterationData: hasIterationData,
+    selectedRequestIds: selectedIds,
+    results: results
+  };
+
+  let successColor = successCount === totalRequests ? '#4CAF50' : '#ff9800';
+  if (failureCount > 0) successColor = '#f44336';
+
+  let reportButtonHtml = '';
+  if (reportUrl) {
+    reportButtonHtml = `
+      <div style="margin-top: 15px;">
+        <a href="${reportUrl}" target="_blank" class="download-report-btn" style="display: inline-block; text-decoration: none; margin-right: 10px;">
+          📊 View Newman Extent Report
+        </a>
+      </div>
+    `;
+  }
+
+  const html = `
+    <div class="report-section">
+      <h4>Execution Report</h4>
+      <div class="report-summary">
+        <div class="report-stat">
+          <label>Total Requests</label>
+          <div class="value">${totalRequests}</div>
+        </div>
+        <div class="report-stat">
+          <label>Successful (2xx)</label>
+          <div class="value" style="color: #4CAF50;">${successCount}</div>
+        </div>
+        <div class="report-stat ${failureCount > 0 ? 'failed' : ''}">
+          <label>Failed (4xx+)</label>
+          <div class="value" style="color: ${failureCount > 0 ? '#f44336' : '#4CAF50'};">${failureCount}</div>
+        </div>
+        <div class="report-stat ${warningCount > 0 ? 'warning' : ''}">
+          <label>Redirects (3xx)</label>
+          <div class="value" style="color: ${warningCount > 0 ? '#ff9800' : '#4CAF50'};">${warningCount}</div>
+        </div>
+      </div>
+      <p><strong>Iteration Data:</strong> ${hasIterationData ? '✓ Loaded' : '✗ Not provided'}</p>
+      <p><strong>Execution Time:</strong> ${new Date().toLocaleString()}</p>
+      <button class="download-report-btn" onclick="downloadReport()">📥 Download JSON Report</button>
+      ${reportButtonHtml}
+    </div>
+  `;
+
+  let resultsHtml = html + '<h3>Request Results</h3>';
+  
+  results.forEach((result, index) => {
+    const statusColor = result.code >= 200 && result.code < 300 ? '#4CAF50' : 
+                       result.code >= 400 ? '#f44336' : '#ff9800';
+    
+    resultsHtml += `
+      <div class="response-view">
+        <h4 style="color: ${statusColor};">
+          ${index + 1}. ${result.method} ${result.name}
+        </h4>
+        <p><strong>URL:</strong> ${result.url}</p>
+        <p><strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${result.status} (${result.code})</span></p>
+        <label><strong>Response Body:</strong></label><br>
+        <textarea class="response-textarea" readonly>${result.body}</textarea>
+      </div>
+    `;
+  });
+
+  return {
+    html: resultsHtml,
+    data: reportData
+  };
+}
+
+// Download report function
+function downloadReport() {
+  const resultsDiv = document.getElementById('results-list');
+  const reportData = JSON.parse(resultsDiv.dataset.reportData || '{}');
+  
+  const element = document.createElement('a');
+  element.setAttribute('href', 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(reportData, null, 2)));
+  element.setAttribute('download', `postman-report-${new Date().getTime()}.json`);
+  element.style.display = 'none';
+  document.body.appendChild(element);
+  element.click();
+  document.body.removeChild(element);
+}
 
 // Tab switching
 document.querySelectorAll('.tab').forEach(tab => {
@@ -254,19 +348,12 @@ document.getElementById('send-request').addEventListener('click', async () => {
       return;
     }
 
-    resultsList.innerHTML = '';
-    data.requestResults.forEach(result => {
-      const div = document.createElement('div');
-      div.className = 'response-view';
-      div.innerHTML = `
-        <h4>${result.method} ${result.name}</h4>
-        <p><strong>URL:</strong> ${result.url}</p>
-        <p><strong>Status:</strong> ${result.status} (${result.code})</p>
-        <label><strong>Response Body:</strong></label><br>
-        <textarea class="response-textarea" readonly>${result.body}</textarea>
-      `;
-      resultsList.appendChild(div);
-    });
+    // Generate manifest/extent report for single request
+    const hasIterationData = dataFile.files[0];
+    const report = generateManifestReport([selectedRequest.id], data.requestResults, hasIterationData, data.reportUrl);
+    
+    resultsList.innerHTML = report.html;
+    resultsList.dataset.reportData = JSON.stringify(report.data);
 
   } catch (err) {
     resultsList.innerHTML = `Error: ${err.message}`;

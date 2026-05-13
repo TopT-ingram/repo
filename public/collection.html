@@ -7,7 +7,69 @@
   <style>
     .postman-layout {
       display: flex;
-      height: calc(100vh - 100px);
+      height: calc(100vh - 280px);
+    }
+    .upper-controls {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 20px;
+      padding: 15px;
+      background: #f9f9f9;
+      border-bottom: 1px solid #ddd;
+      align-items: flex-start;
+    }
+    #collection-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .form-group label {
+      font-weight: bold;
+    }
+    .form-group input {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .controls-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .primary-btn {
+      padding: 10px 20px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      min-width: 180px;
+    }
+    .primary-btn:hover {
+      background: #45a049;
+    }
+    .selection-controls {
+      display: flex;
+      gap: 8px;
+    }
+    .secondary-btn {
+      padding: 8px 16px;
+      background: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      flex: 1;
+    }
+    .secondary-btn:hover {
+      background: #0b7dda;
     }
     .left-pane {
       width: 300px;
@@ -72,6 +134,58 @@
       padding: 8px;
       resize: vertical;
     }
+    .report-section {
+      background: #f0f8ff;
+      padding: 15px;
+      border: 1px solid #2196F3;
+      border-radius: 4px;
+      margin-bottom: 15px;
+    }
+    .report-section h4 {
+      color: #2196F3;
+      margin-top: 0;
+    }
+    .report-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin: 10px 0;
+    }
+    .report-stat {
+      background: white;
+      padding: 10px;
+      border-left: 4px solid #4CAF50;
+      border-radius: 4px;
+    }
+    .report-stat.failed {
+      border-left-color: #f44336;
+    }
+    .report-stat.warning {
+      border-left-color: #ff9800;
+    }
+    .report-stat label {
+      font-weight: bold;
+      display: block;
+      color: #666;
+      font-size: 0.85rem;
+    }
+    .report-stat .value {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #333;
+    }
+    .download-report-btn {
+      padding: 8px 16px;
+      background: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .download-report-btn:hover {
+      background: #0b7dda;
+    }
   </style>
 </head>
 <body>
@@ -82,22 +196,31 @@
     <a class="utility-link" href="/" target="_self">Back to API Test Runner</a>
   </div>
 
-  <form id="collection-form">
-    <label><b>Postman Collection JSON</b></label><br>
-    <input type="file" id="collection-file" accept="application/json" required /><br><br>
+  <div class="upper-controls">
+    <form id="collection-form">
+      <div class="form-group">
+        <label><b>Postman Collection JSON</b></label><br>
+        <input type="file" id="collection-file" accept="application/json" required /><br>
+      </div>
 
-    <label><b>Iteration Data (Excel, CSV, or JSON)</b></label><br>
-    <input type="file" id="data-file" name="dataFile" accept=".xlsx,.xls,.csv,.json" /><br><br>
-  </form>
+      <div class="form-group">
+        <label><b>Iteration Data (Excel, CSV, or JSON)</b></label><br>
+        <input type="file" id="data-file" name="dataFile" accept=".xlsx,.xls,.csv,.json" /><br>
+      </div>
+    </form>
+
+    <div class="controls-group">
+      <button id="run-selected" class="primary-btn">Run Selected Requests</button>
+      <div class="selection-controls">
+        <button id="select-all" class="secondary-btn">Select All</button>
+        <button id="unselect-all" class="secondary-btn">Unselect All</button>
+      </div>
+    </div>
+  </div>
 
   <div class="postman-layout">
     <div class="left-pane">
       <h3>Collections</h3>
-      <button id="run-selected" style="margin-bottom: 10px;">Run Selected Requests</button>
-      <div style="margin-bottom: 10px;">
-        <button id="select-all">Select All</button>
-        <button id="unselect-all">Unselect All</button>
-      </div>
       <div id="tree-container"></div>
     </div>
     <div class="right-pane">

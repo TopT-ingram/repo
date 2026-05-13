@@ -405,6 +405,14 @@ app.post('/run-selected', upload.fields([
       iterationData = parseIterationData(iterationDataPath);
     }
 
+    // Create reports directory if it doesn't exist
+    if (!fs.existsSync('reports')) fs.mkdirSync('reports');
+
+    // Generate unique report name
+    const timestamp = Date.now();
+    const reportDir = path.join(__dirname, 'reports', `report-${timestamp}`);
+    const reportPath = path.join(reportDir, 'index.html');
+
     const requestResults = [];
 
     newman.run({
@@ -414,7 +422,12 @@ app.post('/run-selected', upload.fields([
       timeoutScript: NEWMAN_SCRIPT_TIMEOUT,
       timeout: NEWMAN_RUN_TIMEOUT,
       insecure: true,
-      reporters: ['cli']
+      reporters: ['cli', 'htmlextra'],
+      reporter: {
+        htmlextra: {
+          export: reportPath
+        }
+      }
     })
     .on('request', (err, args) => {
       if (err) {
@@ -440,12 +453,15 @@ app.post('/run-selected', upload.fields([
 
       const { total, failed, passed } = getAssertionStats(summary);
       const status = err || failed > 0 ? 'failed' : 'success';
+      const reportUrl = `/reports/report-${timestamp}/index.html`;
+
       return res.json({
         status,
         total,
         failed,
         passed,
         requestResults,
+        reportUrl,
         error: err?.message
       });
     });
