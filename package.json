@@ -1,23 +1,30 @@
 {
   "name": "postman",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Postman/Newman execution dashboard with HTML reporting",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "node server.js",
+    "audit": "npm audit --omit=dev",
+    "audit:fix": "npm audit fix",
+    "test": "echo \"No automated tests configured\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=20 <23",
+    "npm": ">=10"
+  },
   "dependencies": {
     "crypto-js": "^4.2.0",
     "csv-parse": "^6.2.1",
-    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "multer": "^2.1.1",
-    "newman": "^6.0.0",
-    "newman-reporter-htmlextra": "^1.22.5",
-    "xlsx": "^0.18.5"
+    "newman": "^6.2.2",
+    "newman-reporter-htmlextra": "^1.23.1",
+    "read-excel-file": "^9.0.9"
   }
 }
