@@ -4,14 +4,15 @@ const newman = require('newman');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
+const { parse: parseCsv } = require('csv-parse/sync');
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
-const NEWMAN_REQUEST_TIMEOUT = 120000;
-const NEWMAN_SCRIPT_TIMEOUT = 300000;
-const NEWMAN_RUN_TIMEOUT = 900000;
+const NEWMAN_REQUEST_TIMEOUT = parseInt(process.env.NEWMAN_REQUEST_TIMEOUT || '120000', 10);
+const NEWMAN_SCRIPT_TIMEOUT = parseInt(process.env.NEWMAN_SCRIPT_TIMEOUT || '600000', 10);
+const NEWMAN_RUN_TIMEOUT = parseInt(process.env.NEWMAN_RUN_TIMEOUT || '1800000', 10);
 
 app.use(express.static('public'));
 app.use('/reports', express.static(path.join(__dirname, 'reports')));
@@ -142,27 +143,72 @@ function getAssertionStats(summary) {
   };
 }
 
-function parseIterationData(filePath) {
+function getRunErrorMessage(err) {
+  if (!err) {
+    return '';
+  }
+
+  const rawMessage = String(err.message || err);
+  const lowered = rawMessage.toLowerCase();
+
+  if (lowered.includes('callback timed out') || lowered.includes('timeout')) {
+    return `${rawMessage}\n\nLikely cause: execution exceeded Newman timeout limits (request/script/run) or an async callback in scripts never completed. Current run timeout is ${NEWMAN_RUN_TIMEOUT}ms.`;
+  }
+
+  return rawMessage;
+}
+
+async function parseIterationData(filePath) {
   const ext = path.extname(filePath).toLowerCase();
 
-  if (ext === '.xlsx' || ext === '.xls') {
-    const workbook = XLSX.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    return XLSX.utils.sheet_to_json(sheet);
+  if (ext === '.xlsx') {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.worksheets[0];
+
+    if (!worksheet) {
+      return [];
+    }
+
+    const rows = [];
+    worksheet.eachRow((row) => {
+      rows.push(row.values.slice(1));
+    });
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const headers = rows[0].map((header) => String(header ?? '').trim());
+    return rows.slice(1)
+      .filter((values) => values.some((value) => value !== undefined && value !== null && String(value).trim() !== ''))
+      .map((values) => {
+        const item = {};
+        headers.forEach((header, idx) => {
+          if (header) {
+            item[header] = values[idx] ?? '';
+          }
+        });
+        return item;
+      });
   }
 
   const fileText = fs.readFileSync(filePath, 'utf-8').trim();
 
   if (ext === '.csv') {
-    const workbook = XLSX.read(fileText, { type: 'string' });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    return XLSX.utils.sheet_to_json(sheet);
+    return parseCsv(fileText, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true
+    });
   }
 
   if (ext === '.json') {
     return JSON.parse(fileText);
+  }
+
+  if (ext === '.xls') {
+    throw new Error('Unsupported iteration data format (.xls). Please use .xlsx, .csv, or .json.');
   }
 
   // Best-effort fallback: try JSON then CSV.
@@ -170,12 +216,13 @@ function parseIterationData(filePath) {
     return JSON.parse(fileText);
   } catch (jsonError) {
     try {
-      const workbook = XLSX.read(fileText, { type: 'string' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      return XLSX.utils.sheet_to_json(sheet);
+      return parseCsv(fileText, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true
+      });
     } catch (xlsError) {
-      throw new Error(`Unsupported iteration data format${ext ? ` (${ext})` : ''}. JSON error: ${jsonError.message}; CSV/XLSX error: ${xlsError.message}`);
+      throw new Error(`Unsupported iteration data format${ext ? ` (${ext})` : ''}. JSON error: ${jsonError.message}; CSV error: ${xlsError.message}`);
     }
   }
 }
@@ -298,7 +345,7 @@ app.post('/run', upload.fields([
           const { total, failed, passed } = getAssertionStats(summary);
           const status = err || failed > 0 || failures > 0 ? 'failed' : 'success';
           const fallbackMessage = err
-            ? err.message
+            ? getRunErrorMessage(err)
             : 'The detailed Newman HTML report was not generated, so this fallback summary was created instead.';
 
           if (!fs.existsSync(reportPath)) {
@@ -330,7 +377,7 @@ app.post('/run', upload.fields([
 
           progress.logs[file.originalname].push(`⏱ ${duration}s`);
           if (err) {
-            progress.logs[file.originalname].push(`❌ ${err.message}`);
+            progress.logs[file.originalname].push(`❌ ${getRunErrorMessage(err)}`);
           }
           if (failures > 0) {
             progress.logs[file.originalname].push(`⚠ Failure events: ${failures}`);
@@ -402,7 +449,7 @@ app.post('/run-selected', upload.fields([
     let iterationData;
     if (req.files['dataFile'] && req.files['dataFile'][0]) {
       iterationDataPath = req.files['dataFile'][0].path;
-      iterationData = parseIterationData(iterationDataPath);
+      iterationData = await parseIterationData(iterationDataPath);
     }
 
     // Create reports directory if it doesn't exist

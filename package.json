@@ -12,6 +12,8 @@
   "type": "commonjs",
   "dependencies": {
     "crypto-js": "^4.2.0",
+    "csv-parse": "^6.2.1",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "multer": "^2.1.1",
     "newman": "^6.0.0",
