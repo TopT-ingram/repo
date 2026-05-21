@@ -4,7 +4,7 @@ const newman = require('newman');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const ExcelJS = require('exceljs');
+const readXlsxFile = require('read-excel-file/node');
 const { parse: parseCsv } = require('csv-parse/sync');
 
 const app = express();
@@ -162,18 +162,7 @@ async function parseIterationData(filePath) {
   const ext = path.extname(filePath).toLowerCase();
 
   if (ext === '.xlsx') {
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(filePath);
-    const worksheet = workbook.worksheets[0];
-
-    if (!worksheet) {
-      return [];
-    }
-
-    const rows = [];
-    worksheet.eachRow((row) => {
-      rows.push(row.values.slice(1));
-    });
+    const rows = await readXlsxFile(filePath);
 
     if (rows.length === 0) {
       return [];

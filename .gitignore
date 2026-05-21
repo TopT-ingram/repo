@@ -2,3 +2,6 @@ node_modules/
 .env
 dist/
 build/
+reports/
+uploads/
+npm-debug.log*
