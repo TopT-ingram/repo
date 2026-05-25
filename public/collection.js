@@ -8,6 +8,67 @@ const resultsList = document.getElementById('results-list');
 let allRequests = [];
 let collectionData = null;
 let selectedRequest = null;
+const folderToRequests = new Map();
+const requestToFolders = new Map();
+
+function ensureRequestAncestors(requestId, folderId) {
+  const ancestors = requestToFolders.get(requestId) || [];
+  ancestors.push(folderId);
+  requestToFolders.set(requestId, ancestors);
+}
+
+function collectRequestIds(items, prefix = []) {
+  let ids = [];
+
+  items.forEach((item, idx) => {
+    const id = [...prefix, idx].join('.');
+    if (item.item && Array.isArray(item.item)) {
+      ids = ids.concat(collectRequestIds(item.item, [...prefix, idx]));
+    } else {
+      ids.push(id);
+    }
+  });
+
+  return ids;
+}
+
+function setFolderState(folderId) {
+  const folderCheckbox = document.querySelector(`.folder-checkbox[data-id="${folderId}"]`);
+  if (!folderCheckbox) {
+    return;
+  }
+
+  const childRequestIds = folderToRequests.get(folderId) || [];
+  const childCheckboxes = childRequestIds
+    .map((id) => document.querySelector(`.request-checkbox[data-id="${id}"]`))
+    .filter(Boolean);
+
+  if (!childCheckboxes.length) {
+    folderCheckbox.checked = false;
+    folderCheckbox.indeterminate = false;
+    return;
+  }
+
+  const checkedCount = childCheckboxes.filter((cb) => cb.checked).length;
+  folderCheckbox.checked = checkedCount === childCheckboxes.length;
+  folderCheckbox.indeterminate = checkedCount > 0 && checkedCount < childCheckboxes.length;
+}
+
+function refreshAllFolderStates() {
+  const folderIds = Array.from(folderToRequests.keys()).sort((a, b) => b.split('.').length - a.split('.').length);
+  folderIds.forEach(setFolderState);
+}
+
+function toggleFolder(folderId, checked) {
+  const childRequestIds = folderToRequests.get(folderId) || [];
+  childRequestIds.forEach((requestId) => {
+    const requestCheckbox = document.querySelector(`.request-checkbox[data-id="${requestId}"]`);
+    if (requestCheckbox) {
+      requestCheckbox.checked = checked;
+    }
+  });
+  refreshAllFolderStates();
+}
 
 function buildTree(items, container, prefix = []) {
   items.forEach((item, idx) => {
@@ -18,8 +79,27 @@ function buildTree(items, container, prefix = []) {
 
     if (item.item && Array.isArray(item.item)) {
       div.className += ' folder-item';
-      div.textContent = item.name || 'Folder';
+      const folderCheckbox = document.createElement('input');
+      folderCheckbox.type = 'checkbox';
+      folderCheckbox.className = 'folder-checkbox';
+      folderCheckbox.dataset.id = id;
+      folderCheckbox.style.marginRight = '8px';
+
+      const label = document.createElement('span');
+      label.textContent = item.name || 'Folder';
+
+      const childRequestIds = collectRequestIds(item.item, [...prefix, idx]);
+      folderToRequests.set(id, childRequestIds);
+      childRequestIds.forEach((requestId) => ensureRequestAncestors(requestId, id));
+
+      div.appendChild(folderCheckbox);
+      div.appendChild(label);
       container.appendChild(div);
+
+      folderCheckbox.addEventListener('change', () => {
+        toggleFolder(id, folderCheckbox.checked);
+      });
+
       const subContainer = document.createElement('div');
       subContainer.style.marginLeft = '20px';
       container.appendChild(subContainer);
@@ -44,7 +124,8 @@ function buildTree(items, container, prefix = []) {
       });
 
       checkbox.addEventListener('change', () => {
-        // Optional: if checked, select for editing too, but for now, separate
+        const ancestorFolders = requestToFolders.get(id) || [];
+        ancestorFolders.forEach(setFolderState);
       });
     }
   });
@@ -143,8 +224,11 @@ collectionFile.addEventListener('change', async () => {
   try {
     collectionData = JSON.parse(text);
     allRequests = traverseCollection(collectionData.item || []);
+    folderToRequests.clear();
+    requestToFolders.clear();
     treeContainer.innerHTML = '';
     buildTree(collectionData.item || [], treeContainer);
+    refreshAllFolderStates();
   } catch (error) {
     alert('Invalid JSON collection');
   }
@@ -363,8 +447,10 @@ document.getElementById('send-request').addEventListener('click', async () => {
 // Select All / Unselect All
 document.getElementById('select-all').addEventListener('click', () => {
   document.querySelectorAll('.request-checkbox').forEach(cb => cb.checked = true);
+  refreshAllFolderStates();
 });
 
 document.getElementById('unselect-all').addEventListener('click', () => {
   document.querySelectorAll('.request-checkbox').forEach(cb => cb.checked = false);
+  refreshAllFolderStates();
 });

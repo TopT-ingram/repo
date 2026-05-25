@@ -111,6 +111,13 @@ button:hover,
   margin-top: 0;
 }
 
+.utility-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
 #logs {
   background: #111;
   color: #0f0;
@@ -175,6 +182,16 @@ button:hover,
   flex-direction: column;
   gap: 12px;
   margin-bottom: 14px;
+}
+
+.add-row-btn {
+  width: 100%;
+  margin: 0 0 14px;
+  background: #0f766e;
+}
+
+.add-row-btn:hover {
+  background: #115e59;
 }
 
 .field-row {

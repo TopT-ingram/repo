@@ -36,11 +36,8 @@ function buildRow(mode, rowNumber) {
       <span class="field-row-title">${config.actionLabel} Value ${rowNumber}</span>
       <button type="button" class="icon-btn remove-btn" aria-label="Remove row">×</button>
     </div>
-    <label><strong>Variable Name</strong></label>
-    <input type="text" class="field-label" placeholder="username">
     <label><strong>${config.actionLabel === 'Encrypt' ? 'Plain Text' : 'Encrypted Text'}</strong></label>
     <textarea class="field-input" rows="3" placeholder="${config.placeholder}"></textarea>
-    <label><strong>Output</strong></label>
     <textarea class="field-output" rows="3" readonly placeholder="Output will appear here"></textarea>
   `;
 
@@ -89,7 +86,6 @@ function processRows(mode) {
   const lines = [];
 
   Array.from(fields.children).forEach((row, index) => {
-    const label = row.querySelector('.field-label').value.trim() || `Value ${index + 1}`;
     const input = row.querySelector('.field-input').value;
     const output = row.querySelector('.field-output');
 
@@ -111,7 +107,7 @@ function processRows(mode) {
     }
 
     output.value = resultText;
-    lines.push(`${label}:\n${resultText}`);
+    lines.push(resultText);
   });
 
   setCombinedResult(mode, lines);
