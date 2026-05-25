@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>API Encryption / Decryption Utility</title>
+  <title>UI Encryption / Decryption Utility</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="crypto-page">
   <main class="crypto-shell">
-    <h1>API Encryption / Decryption Utility</h1>
-    <p class="helper-text">Use the same AES flow as your Postman script: enter a passphrase, add as many values as needed with the <strong>+</strong> button, then encrypt or decrypt all rows in one click.</p>
+    <h1>UI Encryption / Decryption Utility</h1>
+    <p class="helper-text">Use the fixed UI AES flow: add as many values as needed with the Add More Values button, then encrypt or decrypt all rows in one click.</p>
 
     <div class="crypto-grid">
       <section class="crypto-panel">
@@ -18,13 +18,11 @@
             <h2>Encryption</h2>
             <p class="helper-text">Plain text in, encrypted value out.</p>
           </div>
-          <button type="button" class="icon-btn" id="addEncryptRow" aria-label="Add encryption row">+</button>
         </div>
 
-        <label for="encryptPassphrase"><strong>Passphrase</strong></label>
-        <input type="text" id="encryptPassphrase" value="Avengers" placeholder="Avengers">
-
         <div id="encryptFields" class="field-list"></div>
+
+        <button type="button" class="add-row-btn" id="addEncryptRow">Add More Values</button>
 
         <div class="panel-actions">
           <button type="button" class="primary-btn" id="encryptAll">Encrypt All</button>
@@ -41,13 +39,11 @@
             <h2>Decryption</h2>
             <p class="helper-text">Encrypted value in, plain text out.</p>
           </div>
-          <button type="button" class="icon-btn" id="addDecryptRow" aria-label="Add decryption row">+</button>
         </div>
 
-        <label for="decryptPassphrase"><strong>Passphrase</strong></label>
-        <input type="text" id="decryptPassphrase" value="Avengers" placeholder="Avengers">
-
         <div id="decryptFields" class="field-list"></div>
+
+        <button type="button" class="add-row-btn" id="addDecryptRow">Add More Values</button>
 
         <div class="panel-actions">
           <button type="button" class="primary-btn" id="decryptAll">Decrypt All</button>
@@ -61,6 +57,6 @@
   </main>
 
   <script src="/vendor/crypto-js/crypto-js.js"></script>
-  <script src="crypto.js"></script>
+  <script src="cryptoUI.js"></script>
 </body>
 </html>
