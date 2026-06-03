@@ -4,12 +4,341 @@ const treeContainer = document.getElementById('tree-container');
 const requestEditor = document.getElementById('request-editor');
 const runResults = document.getElementById('run-results');
 const resultsList = document.getElementById('results-list');
+const toggleVariablesBtn = document.getElementById('toggle-variables');
+const variablesPanel = document.getElementById('variables-panel');
+const variablesToggleIcon = document.getElementById('variables-toggle-icon');
+const variablesTitle = document.getElementById('variables-title');
+const variablesTableBody = document.getElementById('variables-table-body');
+const variablesEmptyState = document.getElementById('variables-empty-state');
+const addVariableBtn = document.getElementById('add-variable');
+const variableSearchInput = document.getElementById('variable-search');
+const importVariablesBtn = document.getElementById('import-variables');
+const exportVariablesBtn = document.getElementById('export-variables');
+const variablesImportFile = document.getElementById('variables-import-file');
 
 let allRequests = [];
 let collectionData = null;
 let selectedRequest = null;
 const folderToRequests = new Map();
 const requestToFolders = new Map();
+let collectionVariables = [];
+let variableIdCounter = 1;
+
+function createVariable(overrides = {}) {
+  return {
+    id: `var-${Date.now()}-${variableIdCounter++}`,
+    key: '',
+    value: '',
+    description: '',
+    secret: false,
+    showValue: false,
+    ...overrides
+  };
+}
+
+function setVariablesPanelExpanded(expanded) {
+  if (!variablesPanel || !toggleVariablesBtn || !variablesToggleIcon) {
+    return;
+  }
+
+  if (expanded) {
+    variablesPanel.classList.remove('collapsed');
+    toggleVariablesBtn.setAttribute('aria-expanded', 'true');
+    variablesToggleIcon.textContent = '-';
+  } else {
+    variablesPanel.classList.add('collapsed');
+    toggleVariablesBtn.setAttribute('aria-expanded', 'false');
+    variablesToggleIcon.textContent = '+';
+  }
+}
+
+function updateVariablesHeader() {
+  if (variablesTitle) {
+    variablesTitle.textContent = `Collection Variables (${collectionVariables.length})`;
+  }
+}
+
+function getFilteredVariables() {
+  const keyword = (variableSearchInput?.value || '').trim().toLowerCase();
+  if (!keyword) {
+    return collectionVariables;
+  }
+
+  return collectionVariables.filter((item) => {
+    return [item.key, item.value, item.description].some((field) => String(field || '').toLowerCase().includes(keyword));
+  });
+}
+
+function moveVariable(id, direction) {
+  const index = collectionVariables.findIndex((item) => item.id === id);
+  if (index < 0) {
+    return;
+  }
+
+  const nextIndex = index + direction;
+  if (nextIndex < 0 || nextIndex >= collectionVariables.length) {
+    return;
+  }
+
+  const temp = collectionVariables[index];
+  collectionVariables[index] = collectionVariables[nextIndex];
+  collectionVariables[nextIndex] = temp;
+  renderVariablesTable();
+}
+
+function removeVariable(id) {
+  collectionVariables = collectionVariables.filter((item) => item.id !== id);
+  renderVariablesTable();
+}
+
+function addVariableRow(defaults = {}) {
+  collectionVariables.push(createVariable(defaults));
+  renderVariablesTable();
+
+  setVariablesPanelExpanded(true);
+
+  const lastId = collectionVariables[collectionVariables.length - 1]?.id;
+  const nameInput = variablesTableBody.querySelector(`tr[data-id="${lastId}"] input[data-field="key"]`);
+  if (nameInput) {
+    nameInput.focus();
+  }
+}
+
+function toCollectionVariablesPayload() {
+  return collectionVariables
+    .filter((item) => item.key && String(item.key).trim())
+    .map((item) => ({
+      key: String(item.key).trim(),
+      value: item.value == null ? '' : String(item.value),
+      description: item.description == null ? '' : String(item.description),
+      type: item.secret ? 'secret' : 'string'
+    }));
+}
+
+function parseCollectionVariables(value) {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === 'object' && Array.isArray(value.variable)) {
+    return value.variable;
+  }
+
+  if (typeof value === 'object') {
+    return Object.entries(value).map(([key, val]) => ({ key, value: val }));
+  }
+
+  return [];
+}
+
+function loadCollectionVariablesFromCollection(collection) {
+  const parsed = parseCollectionVariables(collection?.variable).map((item) => {
+    const key = item?.key == null ? '' : String(item.key);
+    const value = item?.value == null ? '' : String(item.value);
+    const description = item?.description?.content || item?.description || '';
+    const type = String(item?.type || '').toLowerCase();
+    const secret = type === 'secret';
+
+    return createVariable({
+      key,
+      value,
+      description: String(description || ''),
+      secret,
+      showValue: !secret
+    });
+  });
+
+  collectionVariables = parsed;
+  renderVariablesTable();
+
+  if (parsed.length > 0) {
+    setVariablesPanelExpanded(true);
+  }
+}
+
+function mergeImportedVariables(importedVars) {
+  const incoming = parseCollectionVariables(importedVars).map((item) => ({
+    key: item?.key == null ? '' : String(item.key),
+    value: item?.value == null ? '' : String(item.value),
+    description: item?.description?.content || item?.description || '',
+    type: String(item?.type || '').toLowerCase()
+  })).filter((item) => item.key.trim());
+
+  if (!incoming.length) {
+    return;
+  }
+
+  incoming.forEach((entry) => {
+    const existing = collectionVariables.find((item) => String(item.key).trim() === entry.key.trim());
+    if (existing) {
+      existing.value = entry.value;
+      existing.description = String(entry.description || '');
+      existing.secret = entry.type === 'secret' ? true : existing.secret;
+      if (!existing.secret) {
+        existing.showValue = true;
+      }
+    } else {
+      const secret = entry.type === 'secret';
+      collectionVariables.push(createVariable({
+        key: entry.key,
+        value: entry.value,
+        description: String(entry.description || ''),
+        secret,
+        showValue: !secret
+      }));
+    }
+  });
+
+  renderVariablesTable();
+  setVariablesPanelExpanded(true);
+}
+
+function renderVariablesTable() {
+  if (!variablesTableBody || !variablesEmptyState) {
+    return;
+  }
+
+  const filtered = getFilteredVariables();
+  variablesTableBody.innerHTML = '';
+
+  filtered.forEach((item) => {
+    const row = document.createElement('tr');
+    row.dataset.id = item.id;
+
+    const nameCell = document.createElement('td');
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = item.key;
+    nameInput.placeholder = 'Variable name';
+    nameInput.dataset.field = 'key';
+    nameInput.addEventListener('input', (event) => {
+      item.key = event.target.value;
+      updateVariablesHeader();
+    });
+    nameCell.appendChild(nameInput);
+
+    const valueCell = document.createElement('td');
+    const valueInput = document.createElement('input');
+    valueInput.type = item.secret && !item.showValue ? 'password' : 'text';
+    valueInput.value = item.value;
+    valueInput.placeholder = 'Variable value';
+    valueInput.dataset.field = 'value';
+    valueInput.addEventListener('input', (event) => {
+      item.value = event.target.value;
+    });
+    valueCell.appendChild(valueInput);
+
+    const descriptionCell = document.createElement('td');
+    const descriptionInput = document.createElement('input');
+    descriptionInput.type = 'text';
+    descriptionInput.value = item.description;
+    descriptionInput.placeholder = 'Description';
+    descriptionInput.dataset.field = 'description';
+    descriptionInput.addEventListener('input', (event) => {
+      item.description = event.target.value;
+    });
+    descriptionCell.appendChild(descriptionInput);
+
+    const secretCell = document.createElement('td');
+    const secretToggle = document.createElement('input');
+    secretToggle.type = 'checkbox';
+    secretToggle.checked = item.secret;
+    secretToggle.title = 'Mask variable value';
+    secretToggle.addEventListener('change', () => {
+      item.secret = secretToggle.checked;
+      if (!item.secret) {
+        item.showValue = true;
+      } else {
+        item.showValue = false;
+      }
+      renderVariablesTable();
+    });
+    secretCell.appendChild(secretToggle);
+
+    const actionsCell = document.createElement('td');
+    const actions = document.createElement('div');
+    actions.className = 'variables-actions';
+
+    const showHideBtn = document.createElement('button');
+    showHideBtn.type = 'button';
+    showHideBtn.className = 'mini-btn';
+    showHideBtn.textContent = item.secret && !item.showValue ? 'Show' : 'Hide';
+    showHideBtn.addEventListener('click', () => {
+      item.showValue = !item.showValue;
+      renderVariablesTable();
+    });
+
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'mini-btn';
+    copyBtn.textContent = 'Copy';
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(item.value || '');
+      } catch (error) {
+        console.warn('Failed to copy variable value:', error);
+      }
+    });
+
+    const upBtn = document.createElement('button');
+    upBtn.type = 'button';
+    upBtn.className = 'mini-btn';
+    upBtn.textContent = '↑';
+    upBtn.addEventListener('click', () => moveVariable(item.id, -1));
+
+    const downBtn = document.createElement('button');
+    downBtn.type = 'button';
+    downBtn.className = 'mini-btn';
+    downBtn.textContent = '↓';
+    downBtn.addEventListener('click', () => moveVariable(item.id, 1));
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'mini-btn danger';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () => removeVariable(item.id));
+
+    actions.appendChild(showHideBtn);
+    actions.appendChild(copyBtn);
+    actions.appendChild(upBtn);
+    actions.appendChild(downBtn);
+    actions.appendChild(deleteBtn);
+    actionsCell.appendChild(actions);
+
+    [nameInput, valueInput, descriptionInput].forEach((input) => {
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          addVariableRow();
+        }
+      });
+    });
+
+    row.appendChild(nameCell);
+    row.appendChild(valueCell);
+    row.appendChild(descriptionCell);
+    row.appendChild(secretCell);
+    row.appendChild(actionsCell);
+    variablesTableBody.appendChild(row);
+  });
+
+  if (!filtered.length) {
+    variablesEmptyState.style.display = 'block';
+    if (collectionVariables.length) {
+      variablesEmptyState.innerHTML = 'No variables match your search.';
+    } else {
+      variablesEmptyState.innerHTML = 'No collection variables found.<br>Click "Add Variable" to create one.';
+    }
+  } else {
+    variablesEmptyState.style.display = 'none';
+  }
+
+  updateVariablesHeader();
+}
 
 function ensureRequestAncestors(requestId, folderId) {
   const ancestors = requestToFolders.get(requestId) || [];
@@ -229,6 +558,7 @@ collectionFile.addEventListener('change', async () => {
     treeContainer.innerHTML = '';
     buildTree(collectionData.item || [], treeContainer);
     refreshAllFolderStates();
+    loadCollectionVariablesFromCollection(collectionData);
   } catch (error) {
     alert('Invalid JSON collection');
   }
@@ -262,6 +592,7 @@ document.getElementById('run-selected').addEventListener('click', async () => {
   formData.append('collection', collectionFile.files[0]);
   if (dataFile.files[0]) formData.append('dataFile', dataFile.files[0]);
   formData.append('selectedIds', JSON.stringify(selectedIds));
+  formData.append('collectionVariables', JSON.stringify(toCollectionVariablesPayload()));
 
   requestEditor.classList.remove('active');
   runResults.classList.add('active');
@@ -418,6 +749,7 @@ document.getElementById('send-request').addEventListener('click', async () => {
   formData.append('collection', collectionFile.files[0]);
   if (dataFile.files[0]) formData.append('dataFile', dataFile.files[0]);
   formData.append('selectedIds', JSON.stringify([selectedRequest.id]));
+  formData.append('collectionVariables', JSON.stringify(toCollectionVariablesPayload()));
 
   requestEditor.classList.remove('active');
   runResults.classList.add('active');
@@ -454,3 +786,57 @@ document.getElementById('unselect-all').addEventListener('click', () => {
   document.querySelectorAll('.request-checkbox').forEach(cb => cb.checked = false);
   refreshAllFolderStates();
 });
+
+if (toggleVariablesBtn) {
+  toggleVariablesBtn.addEventListener('click', () => {
+    const expanded = toggleVariablesBtn.getAttribute('aria-expanded') === 'true';
+    setVariablesPanelExpanded(!expanded);
+  });
+}
+
+if (addVariableBtn) {
+  addVariableBtn.addEventListener('click', () => addVariableRow());
+}
+
+if (variableSearchInput) {
+  variableSearchInput.addEventListener('input', () => renderVariablesTable());
+}
+
+if (importVariablesBtn && variablesImportFile) {
+  importVariablesBtn.addEventListener('click', () => {
+    variablesImportFile.click();
+  });
+
+  variablesImportFile.addEventListener('change', async () => {
+    const file = variablesImportFile.files && variablesImportFile.files[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      mergeImportedVariables(parsed);
+    } catch (error) {
+      alert('Invalid variable JSON file.');
+    } finally {
+      variablesImportFile.value = '';
+    }
+  });
+}
+
+if (exportVariablesBtn) {
+  exportVariablesBtn.addEventListener('click', () => {
+    const exportPayload = toCollectionVariablesPayload();
+    const data = JSON.stringify(exportPayload, null, 2);
+    const anchor = document.createElement('a');
+    anchor.href = `data:application/json;charset=utf-8,${encodeURIComponent(data)}`;
+    anchor.download = 'collection-variables.json';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+  });
+}
+
+setVariablesPanelExpanded(false);
+renderVariablesTable();

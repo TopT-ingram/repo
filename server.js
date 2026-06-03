@@ -96,6 +96,68 @@ function buildSubsetItems(items, selectedIds, prefix = []) {
   return filtered;
 }
 
+function normalizeCollectionVariable(item) {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const key = item.key == null ? '' : String(item.key).trim();
+  if (!key) {
+    return null;
+  }
+
+  const normalized = {
+    ...item,
+    key,
+    value: item.value == null ? '' : String(item.value)
+  };
+
+  if (item.description != null) {
+    normalized.description = String(item.description);
+  }
+
+  if (item.type != null) {
+    normalized.type = String(item.type);
+  }
+
+  return normalized;
+}
+
+function mergeCollectionVariables(baseVariables = [], overrideVariables = []) {
+  const result = [];
+  const indexByKey = new Map();
+
+  baseVariables.forEach((item) => {
+    const normalized = normalizeCollectionVariable(item);
+    if (!normalized) {
+      return;
+    }
+
+    indexByKey.set(normalized.key, result.length);
+    result.push(normalized);
+  });
+
+  overrideVariables.forEach((item) => {
+    const normalized = normalizeCollectionVariable(item);
+    if (!normalized) {
+      return;
+    }
+
+    if (indexByKey.has(normalized.key)) {
+      const idx = indexByKey.get(normalized.key);
+      result[idx] = {
+        ...result[idx],
+        ...normalized
+      };
+    } else {
+      indexByKey.set(normalized.key, result.length);
+      result.push(normalized);
+    }
+  });
+
+  return result;
+}
+
 function createFallbackReport(reportPath, details) {
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -420,6 +482,14 @@ app.post('/run-selected', upload.fields([
       return res.status(400).json({ error: 'No request IDs selected' });
     }
 
+    let runtimeCollectionVariables = [];
+    if (req.body.collectionVariables) {
+      runtimeCollectionVariables = JSON.parse(req.body.collectionVariables);
+      if (!Array.isArray(runtimeCollectionVariables)) {
+        return res.status(400).json({ error: 'collectionVariables must be an array' });
+      }
+    }
+
     const collectionPath = req.files['collection'][0].path;
     const collectionData = JSON.parse(fs.readFileSync(collectionPath, 'utf-8'));
     safeDeleteFile(collectionPath);
@@ -433,6 +503,7 @@ app.post('/run-selected', upload.fields([
       ...collectionData,
       item: subsetItems
     };
+    runCollection.variable = mergeCollectionVariables(collectionData.variable || [], runtimeCollectionVariables);
 
     let iterationDataPath;
     let iterationData;
