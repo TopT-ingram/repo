@@ -10,9 +10,9 @@ const { parse: parseCsv } = require('csv-parse/sync');
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
-const NEWMAN_REQUEST_TIMEOUT = parseInt(process.env.NEWMAN_REQUEST_TIMEOUT || '120000', 10);
-const NEWMAN_SCRIPT_TIMEOUT = parseInt(process.env.NEWMAN_SCRIPT_TIMEOUT || '600000', 10);
-const NEWMAN_RUN_TIMEOUT = parseInt(process.env.NEWMAN_RUN_TIMEOUT || '1800000', 10);
+const NEWMAN_REQUEST_TIMEOUT = parseInt(process.env.NEWMAN_REQUEST_TIMEOUT || '300000', 10);
+const NEWMAN_SCRIPT_TIMEOUT = parseInt(process.env.NEWMAN_SCRIPT_TIMEOUT || '1800000', 10);
+const NEWMAN_RUN_TIMEOUT = parseInt(process.env.NEWMAN_RUN_TIMEOUT || '3600000', 10);
 
 app.use(express.static('public'));
 app.use('/reports', express.static(path.join(__dirname, 'reports')));
@@ -218,6 +218,20 @@ function getRunErrorMessage(err) {
   }
 
   return rawMessage;
+}
+
+function extractFailureDetails(summary, limit = 30) {
+  const failures = summary?.run?.failures;
+  if (!Array.isArray(failures) || failures.length === 0) {
+    return [];
+  }
+
+  return failures.slice(0, limit).map((failure) => ({
+    source: failure?.source?.name || 'Unknown source',
+    parent: failure?.parent?.name || '',
+    error: failure?.error?.message || String(failure?.error || 'Unknown error'),
+    at: failure?.at || ''
+  }));
 }
 
 async function parseIterationData(filePath) {
@@ -519,6 +533,10 @@ app.post('/run-selected', upload.fields([
     const timestamp = Date.now();
     const reportDir = path.join(__dirname, 'reports', `report-${timestamp}`);
     const reportPath = path.join(reportDir, 'index.html');
+    if (!fs.existsSync(reportDir)) {
+      fs.mkdirSync(reportDir, { recursive: true });
+    }
+    const runStart = Date.now();
 
     const requestResults = [];
 
@@ -561,15 +579,38 @@ app.post('/run-selected', upload.fields([
       const { total, failed, passed } = getAssertionStats(summary);
       const status = err || failed > 0 ? 'failed' : 'success';
       const reportUrl = `/reports/report-${timestamp}/index.html`;
+      const duration = ((Date.now() - runStart) / 1000).toFixed(2);
+      const failureDetails = extractFailureDetails(summary);
+
+      if (!fs.existsSync(reportPath)) {
+        const fallbackMessage = err
+          ? getRunErrorMessage(err)
+          : `Detailed Newman HTML report was not generated. Assertions failed: ${failed}/${total}.`;
+
+        createFallbackReport(reportPath, {
+          fileName: `selected-requests-${timestamp}`,
+          status,
+          duration,
+          passed,
+          failed,
+          total,
+          message: fallbackMessage
+        });
+      }
+
+      const reportExists = fs.existsSync(reportPath);
 
       return res.json({
         status,
         total,
         failed,
         passed,
+        duration,
         requestResults,
         reportUrl,
-        error: err?.message
+        reportExists,
+        failureDetails,
+        error: getRunErrorMessage(err)
       });
     });
 

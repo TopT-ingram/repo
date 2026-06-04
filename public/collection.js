@@ -609,7 +609,12 @@ document.getElementById('run-selected').addEventListener('click', async () => {
 
     // Generate manifest/extent report
     const hasIterationData = dataFile.files[0];
-    const report = generateManifestReport(selectedIds, data.requestResults, hasIterationData, data.reportUrl);
+    const report = generateManifestReport(selectedIds, data.requestResults, hasIterationData, data.reportUrl, {
+      error: data.error,
+      duration: data.duration,
+      reportExists: data.reportExists,
+      failureDetails: data.failureDetails
+    });
     
     resultsList.innerHTML = report.html;
     
@@ -622,7 +627,7 @@ document.getElementById('run-selected').addEventListener('click', async () => {
 });
 
 // Generate Manifest/Extent Report
-function generateManifestReport(selectedIds, results, hasIterationData, reportUrl) {
+function generateManifestReport(selectedIds, results, hasIterationData, reportUrl, runMeta = {}) {
   const totalRequests = selectedIds.length;
   const successCount = results.filter(r => r.code >= 200 && r.code < 300).length;
   const failureCount = results.filter(r => r.code >= 400).length;
@@ -653,6 +658,19 @@ function generateManifestReport(selectedIds, results, hasIterationData, reportUr
     `;
   }
 
+  const errorSummaryHtml = runMeta.error
+    ? `<div style="margin-top:10px; padding:10px; border:1px solid #fecaca; background:#fff1f2; border-radius:6px; color:#991b1b;"><strong>Run Error:</strong> ${runMeta.error}</div>`
+    : '';
+
+  const reportMissingHtml = runMeta.reportExists === false
+    ? '<div style="margin-top:10px; padding:10px; border:1px solid #fde68a; background:#fffbeb; border-radius:6px; color:#92400e;"><strong>Report note:</strong> detailed report was not generated; fallback report was created.</div>'
+    : '';
+
+  const failureDetails = Array.isArray(runMeta.failureDetails) ? runMeta.failureDetails : [];
+  const failureDetailsHtml = failureDetails.length
+    ? `<div style="margin-top:10px; padding:10px; border:1px solid #e2e8f0; background:#f8fafc; border-radius:6px;"><strong>Top Failure Details</strong><ul style="margin:8px 0 0 18px; padding:0;">${failureDetails.map((f) => `<li><strong>${f.parent ? `${f.parent} / ` : ''}${f.source}</strong>: ${f.error}</li>`).join('')}</ul></div>`
+    : '';
+
   const html = `
     <div class="report-section">
       <h4>Execution Report</h4>
@@ -676,8 +694,12 @@ function generateManifestReport(selectedIds, results, hasIterationData, reportUr
       </div>
       <p><strong>Iteration Data:</strong> ${hasIterationData ? '✓ Loaded' : '✗ Not provided'}</p>
       <p><strong>Execution Time:</strong> ${new Date().toLocaleString()}</p>
+      ${runMeta.duration ? `<p><strong>Duration:</strong> ${runMeta.duration}s</p>` : ''}
       <button class="download-report-btn" onclick="downloadReport()">📥 Download JSON Report</button>
       ${reportButtonHtml}
+      ${errorSummaryHtml}
+      ${reportMissingHtml}
+      ${failureDetailsHtml}
     </div>
   `;
 
@@ -766,7 +788,12 @@ document.getElementById('send-request').addEventListener('click', async () => {
 
     // Generate manifest/extent report for single request
     const hasIterationData = dataFile.files[0];
-    const report = generateManifestReport([selectedRequest.id], data.requestResults, hasIterationData, data.reportUrl);
+    const report = generateManifestReport([selectedRequest.id], data.requestResults, hasIterationData, data.reportUrl, {
+      error: data.error,
+      duration: data.duration,
+      reportExists: data.reportExists,
+      failureDetails: data.failureDetails
+    });
     
     resultsList.innerHTML = report.html;
     resultsList.dataset.reportData = JSON.stringify(report.data);
