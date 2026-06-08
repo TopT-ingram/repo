@@ -20,7 +20,7 @@
     }
     #collection-form {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: 20px;
     }
     .form-group {
@@ -186,6 +186,141 @@
     .download-report-btn:hover {
       background: #0b7dda;
     }
+    .variables-group {
+      grid-column: 1 / -1;
+    }
+    .variables-card {
+      border: 1px solid #d0d7e2;
+      border-radius: 10px;
+      background: #ffffff;
+      overflow: hidden;
+    }
+    .variables-header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: none;
+      border-bottom: 1px solid #e5e7eb;
+      background: #f8fafc;
+      color: #0f172a;
+      padding: 12px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: left;
+    }
+    .variables-header:hover {
+      background: #f1f5f9;
+    }
+    .variables-panel {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .variables-panel.collapsed {
+      display: none;
+    }
+    .variables-toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .variables-search {
+      min-width: 220px;
+      flex: 1;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .variables-table-wrap {
+      max-height: 300px;
+      overflow: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+    .variables-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 0.92rem;
+      min-width: 760px;
+    }
+    .variables-table th,
+    .variables-table td {
+      border-bottom: 1px solid #eef2f7;
+      padding: 8px;
+      vertical-align: middle;
+    }
+    .variables-table th {
+      position: sticky;
+      top: 0;
+      background: #f8fafc;
+      z-index: 2;
+      text-align: left;
+    }
+    .variables-table input[type="text"] {
+      width: 100%;
+      min-width: 120px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 6px 8px;
+      margin: 0;
+      max-width: none;
+    }
+    .variables-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .mini-btn {
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #0f172a;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+    .mini-btn:hover {
+      background: #f1f5f9;
+    }
+    .mini-btn.danger {
+      border-color: #fecaca;
+      color: #b91c1c;
+      background: #fff5f5;
+    }
+    .mini-btn.danger:hover {
+      background: #fee2e2;
+    }
+    .add-variable-btn {
+      background: #0f766e;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 600;
+      align-self: flex-start;
+    }
+    .add-variable-btn:hover {
+      background: #115e59;
+    }
+    .variables-empty {
+      border: 1px dashed #cbd5e1;
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 14px;
+      color: #475569;
+      font-size: 0.9rem;
+    }
+    @media (max-width: 900px) {
+      .variables-table {
+        min-width: 680px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -201,6 +336,45 @@
       <div class="form-group">
         <label><b>Postman Collection JSON</b></label><br>
         <input type="file" id="collection-file" accept="application/json" required /><br>
+      </div>
+
+      <div class="form-group variables-group">
+        <div class="variables-card">
+          <button type="button" id="toggle-variables" class="variables-header" aria-expanded="false">
+            <span id="variables-title">Collection Variables (0)</span>
+            <span id="variables-toggle-icon">+</span>
+          </button>
+          <div id="variables-panel" class="variables-panel collapsed">
+            <div class="variables-toolbar">
+              <input type="text" id="variable-search" class="variables-search" placeholder="Search variables by name, value, or description" />
+              <button type="button" id="import-variables" class="mini-btn">Import JSON</button>
+              <button type="button" id="export-variables" class="mini-btn">Export JSON</button>
+              <input type="file" id="variables-import-file" accept="application/json" style="display:none;" />
+            </div>
+
+            <div class="variables-table-wrap">
+              <table class="variables-table" aria-label="Collection variables">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Variable Name</th>
+                    <th style="width: 28%;">Value</th>
+                    <th style="width: 28%;">Description</th>
+                    <th style="width: 10%;">Secret</th>
+                    <th style="width: 14%;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="variables-table-body"></tbody>
+              </table>
+            </div>
+
+            <div id="variables-empty-state" class="variables-empty">
+              No collection variables found.<br>
+              Click "Add Variable" to create one.
+            </div>
+
+            <button type="button" id="add-variable" class="add-variable-btn">+ Add Variable</button>
+          </div>
+        </div>
       </div>
 
       <div class="form-group">
