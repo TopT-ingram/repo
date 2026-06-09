@@ -545,6 +545,86 @@ function populateBody(body) {
   }
 }
 
+// Iteration selector state
+let parsedRowCount = 0;
+
+function renderIterationSelector(count) {
+  parsedRowCount = count;
+  const group = document.getElementById('iteration-selector-group');
+  const content = document.getElementById('iteration-selector-content');
+
+  if (!group || !content || count === 0) {
+    clearIterationSelector();
+    return;
+  }
+
+  group.style.display = '';
+
+  let html = `<div class="iteration-info">Rows Detected: <strong>${count}</strong></div>`;
+  html += `<label class="iteration-select-all-label"><input type="checkbox" id="iteration-select-all" checked> Select All</label>`;
+  html += `<div class="iteration-checkboxes" id="iteration-checkboxes">`;
+
+  for (let i = 1; i <= count; i++) {
+    html += `<label class="iteration-checkbox-label"><input type="checkbox" class="iteration-checkbox" data-index="${i - 1}" checked> Iteration ${i}</label>`;
+  }
+
+  html += '</div>';
+  content.innerHTML = html;
+
+  document.getElementById('iteration-select-all').addEventListener('change', (e) => {
+    document.querySelectorAll('.iteration-checkbox').forEach(cb => { cb.checked = e.target.checked; });
+  });
+
+  document.querySelectorAll('.iteration-checkbox').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const all = document.querySelectorAll('.iteration-checkbox');
+      const checked = document.querySelectorAll('.iteration-checkbox:checked');
+      const selectAll = document.getElementById('iteration-select-all');
+      if (selectAll) {
+        selectAll.checked = checked.length === all.length;
+        selectAll.indeterminate = checked.length > 0 && checked.length < all.length;
+      }
+    });
+  });
+}
+
+function clearIterationSelector() {
+  parsedRowCount = 0;
+  const group = document.getElementById('iteration-selector-group');
+  const content = document.getElementById('iteration-selector-content');
+  if (group) group.style.display = 'none';
+  if (content) content.innerHTML = '';
+}
+
+function getSelectedIterations() {
+  const group = document.getElementById('iteration-selector-group');
+  if (!group || group.style.display === 'none') return null;
+  return Array.from(document.querySelectorAll('.iteration-checkbox:checked'))
+    .map(cb => parseInt(cb.dataset.index, 10));
+}
+
+dataFile.addEventListener('change', async () => {
+  const file = dataFile.files[0];
+  if (!file) {
+    clearIterationSelector();
+    return;
+  }
+  try {
+    const fd = new FormData();
+    fd.append('dataFile', file);
+    const response = await fetch('/count-iterations', { method: 'POST', body: fd });
+    if (response.ok) {
+      const data = await response.json();
+      renderIterationSelector(data.rowCount || 0);
+    } else {
+      clearIterationSelector();
+    }
+  } catch (err) {
+    console.error('Failed to count iterations:', err);
+    clearIterationSelector();
+  }
+});
+
 collectionFile.addEventListener('change', async () => {
   const file = collectionFile.files[0];
   if (!file) return;
@@ -588,11 +668,20 @@ document.getElementById('run-selected').addEventListener('click', async () => {
     return;
   }
 
+  const selectedIterations = getSelectedIterations();
+  if (dataFile.files[0] && selectedIterations !== null && selectedIterations.length === 0) {
+    alert('Please select at least one iteration to execute.');
+    return;
+  }
+
   const formData = new FormData();
   formData.append('collection', collectionFile.files[0]);
   if (dataFile.files[0]) formData.append('dataFile', dataFile.files[0]);
   formData.append('selectedIds', JSON.stringify(selectedIds));
   formData.append('collectionVariables', JSON.stringify(toCollectionVariablesPayload()));
+  if (selectedIterations !== null) {
+    formData.append('selectedIterations', JSON.stringify(selectedIterations));
+  }
 
   requestEditor.classList.remove('active');
   runResults.classList.add('active');
@@ -767,11 +856,20 @@ document.getElementById('auth-type').addEventListener('change', () => {
 document.getElementById('send-request').addEventListener('click', async () => {
   if (!selectedRequest) return;
 
+  const selectedIterations = getSelectedIterations();
+  if (dataFile.files[0] && selectedIterations !== null && selectedIterations.length === 0) {
+    alert('Please select at least one iteration to execute.');
+    return;
+  }
+
   const formData = new FormData();
   formData.append('collection', collectionFile.files[0]);
   if (dataFile.files[0]) formData.append('dataFile', dataFile.files[0]);
   formData.append('selectedIds', JSON.stringify([selectedRequest.id]));
   formData.append('collectionVariables', JSON.stringify(toCollectionVariablesPayload()));
+  if (selectedIterations !== null) {
+    formData.append('selectedIterations', JSON.stringify(selectedIterations));
+  }
 
   requestEditor.classList.remove('active');
   runResults.classList.add('active');
