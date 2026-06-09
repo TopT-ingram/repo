@@ -482,6 +482,23 @@ app.post('/run', upload.fields([
   }
 });
 
+app.post('/count-iterations', upload.fields([
+  { name: 'dataFile', maxCount: 1 }
+]), async (req, res) => {
+  if (!req.files || !req.files['dataFile'] || !req.files['dataFile'][0]) {
+    return res.status(400).json({ error: 'dataFile required' });
+  }
+  const filePath = req.files['dataFile'][0].path;
+  try {
+    const data = await parseIterationData(filePath);
+    return res.json({ rowCount: Array.isArray(data) ? data.length : 0 });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  } finally {
+    safeDeleteFile(filePath);
+  }
+});
+
 app.post('/run-selected', upload.fields([
   { name: 'collection', maxCount: 1 },
   { name: 'dataFile', maxCount: 1 }
@@ -524,6 +541,15 @@ app.post('/run-selected', upload.fields([
     if (req.files['dataFile'] && req.files['dataFile'][0]) {
       iterationDataPath = req.files['dataFile'][0].path;
       iterationData = await parseIterationData(iterationDataPath);
+
+      if (req.body.selectedIterations) {
+        const selectedIdxs = JSON.parse(req.body.selectedIterations);
+        if (Array.isArray(selectedIdxs) && selectedIdxs.length > 0 && Array.isArray(iterationData)) {
+          iterationData = selectedIdxs
+            .filter(idx => Number.isInteger(idx) && idx >= 0 && idx < iterationData.length)
+            .map(idx => iterationData[idx]);
+        }
+      }
     }
 
     // Create reports directory if it doesn't exist
