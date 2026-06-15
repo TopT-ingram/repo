@@ -123,37 +123,33 @@ function normalizeCollectionVariable(item) {
   return normalized;
 }
 
-function mergeCollectionVariables(baseVariables = [], overrideVariables = []) {
+function mergeCollectionVariables(baseVariables = [], collectionOverrideVariables = [], environmentOverrideVariables = []) {
   const result = [];
   const indexByKey = new Map();
 
-  baseVariables.forEach((item) => {
-    const normalized = normalizeCollectionVariable(item);
-    if (!normalized) {
-      return;
-    }
+  const applyVariables = (variables) => {
+    variables.forEach((item) => {
+      const normalized = normalizeCollectionVariable(item);
+      if (!normalized) {
+        return;
+      }
 
-    indexByKey.set(normalized.key, result.length);
-    result.push(normalized);
-  });
+      if (indexByKey.has(normalized.key)) {
+        const idx = indexByKey.get(normalized.key);
+        result[idx] = {
+          ...result[idx],
+          ...normalized
+        };
+      } else {
+        indexByKey.set(normalized.key, result.length);
+        result.push(normalized);
+      }
+    });
+  };
 
-  overrideVariables.forEach((item) => {
-    const normalized = normalizeCollectionVariable(item);
-    if (!normalized) {
-      return;
-    }
-
-    if (indexByKey.has(normalized.key)) {
-      const idx = indexByKey.get(normalized.key);
-      result[idx] = {
-        ...result[idx],
-        ...normalized
-      };
-    } else {
-      indexByKey.set(normalized.key, result.length);
-      result.push(normalized);
-    }
-  });
+  applyVariables(baseVariables);
+  applyVariables(collectionOverrideVariables);
+  applyVariables(environmentOverrideVariables);
 
   return result;
 }
@@ -521,6 +517,14 @@ app.post('/run-selected', upload.fields([
       }
     }
 
+    let runtimeEnvironmentVariables = [];
+    if (req.body.environmentVariables) {
+      runtimeEnvironmentVariables = JSON.parse(req.body.environmentVariables);
+      if (!Array.isArray(runtimeEnvironmentVariables)) {
+        return res.status(400).json({ error: 'environmentVariables must be an array' });
+      }
+    }
+
     const collectionPath = req.files['collection'][0].path;
     const collectionData = JSON.parse(fs.readFileSync(collectionPath, 'utf-8'));
     safeDeleteFile(collectionPath);
@@ -534,7 +538,11 @@ app.post('/run-selected', upload.fields([
       ...collectionData,
       item: subsetItems
     };
-    runCollection.variable = mergeCollectionVariables(collectionData.variable || [], runtimeCollectionVariables);
+    runCollection.variable = mergeCollectionVariables(
+      collectionData.variable || [],
+      runtimeCollectionVariables,
+      runtimeEnvironmentVariables
+    );
 
     let iterationDataPath;
     let iterationData;

@@ -425,11 +425,55 @@
             <button type="button" id="add-variable" class="add-variable-btn">+ Add Variable</button>
           </div>
         </div>
+
+        <div class="variables-card" style="margin-top: 10px;">
+          <button type="button" id="toggle-env-variables" class="variables-header" aria-expanded="false">
+            <span id="env-variables-title">Environment Variables (0)</span>
+            <span id="env-variables-toggle-icon">+</span>
+          </button>
+          <div id="env-variables-panel" class="variables-panel collapsed">
+            <div class="variables-toolbar">
+              <input type="text" id="env-variable-search" class="variables-search" placeholder="Search environment variables by name, value, or description" />
+              <button type="button" id="import-env-variables" class="mini-btn">Import JSON</button>
+              <button type="button" id="export-env-variables" class="mini-btn">Export JSON</button>
+              <input type="file" id="env-variables-import-file" accept="application/json" style="display:none;" />
+            </div>
+
+            <div class="variables-table-wrap">
+              <table class="variables-table" aria-label="Environment variables">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Variable Name</th>
+                    <th style="width: 28%;">Value</th>
+                    <th style="width: 28%;">Description</th>
+                    <th style="width: 10%;">Secret</th>
+                    <th style="width: 14%;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="env-variables-table-body"></tbody>
+              </table>
+            </div>
+
+            <div id="env-variables-empty-state" class="variables-empty">
+              No environment variables found.<br>
+              Click "Add Variable" to create one.
+            </div>
+
+            <button type="button" id="add-env-variable" class="add-variable-btn">+ Add Variable</button>
+          </div>
+        </div>
       </div>
 
       <div class="form-group">
         <label><b>Iteration Data (Excel, CSV, or JSON)</b></label><br>
         <input type="file" id="data-file" name="dataFile" accept=".xlsx,.xls,.csv,.json" /><br>
+      </div>
+
+      <div class="form-group">
+        <label><b>Environment JSON (Optional)</b></label><br>
+        <input type="file" id="runtime-env-file" accept="application/json" /><br>
+        <small id="runtime-env-status" style="display:block; margin-top:4px; color:#475569;">No environment file selected.</small>
+        <small>Run-time environment values override environment table values and collection variables with the same key.</small>
       </div>
 
       <div class="form-group" id="iteration-selector-group" style="display:none;">
