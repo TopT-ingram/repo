@@ -201,6 +201,11 @@ function parseCollectionVariables(value) {
     return value.variable;
   }
 
+  // Support Postman environment export format where variables are under `values`.
+  if (typeof value === 'object' && Array.isArray(value.values)) {
+    return value.values;
+  }
+
   if (typeof value === 'object') {
     return Object.entries(value).map(([key, val]) => ({ key, value: val }));
   }
@@ -213,8 +218,9 @@ function normalizeVariableItems(value) {
     key: item?.key == null ? '' : String(item.key),
     value: item?.value == null ? '' : String(item.value),
     description: item?.description?.content || item?.description || '',
-    type: String(item?.type || '').toLowerCase()
-  })).filter((item) => item.key.trim());
+    type: String(item?.type || '').toLowerCase(),
+    enabled: item?.enabled !== false
+  })).filter((item) => item.key.trim() && item.enabled);
 }
 
 function mergePayloadVariables(basePayload, overridePayload) {
@@ -346,11 +352,62 @@ function mergeImportedVariables(scope, importedVars) {
 
 async function buildRuntimeEnvironmentVariablesPayload() {
   let runtimePayload = toEnvironmentVariablesPayload();
-  const runtimeFile = runtimeEnvFileInput?.files && runtimeEnvFileInput.files[0];
-
-  if (!runtimeFile) {
+  const parsedRuntime = await parseRuntimeEnvironmentFile();
+  if (!parsedRuntime) {
     updateRuntimeEnvStatus('No environment file selected.');
     return runtimePayload;
+  }
+
+  const nonEmptyRuntimePayload = parsedRuntime.payload.filter((item) => String(item?.value ?? '').trim() !== '');
+  const ignoredEmptyCount = parsedRuntime.payload.length - nonEmptyRuntimePayload.length;
+
+  const collisions = countCollisions(runtimePayload, nonEmptyRuntimePayload);
+  runtimePayload = mergePayloadVariables(runtimePayload, nonEmptyRuntimePayload);
+  if (collisions > 0) {
+    const ignoredText = ignoredEmptyCount > 0 ? ` ${ignoredEmptyCount} empty value(s) ignored.` : '';
+    updateRuntimeEnvStatus(`${parsedRuntime.fileName} selected. ${collisions} key(s) override current environment values.${ignoredText}`, true);
+  } else {
+    const ignoredText = ignoredEmptyCount > 0 ? ` ${ignoredEmptyCount} empty value(s) ignored.` : '';
+    updateRuntimeEnvStatus(`${parsedRuntime.fileName} selected. No key overrides detected.${ignoredText}`);
+  }
+  return runtimePayload;
+}
+
+function getHostPlaceholderKeysFromCollection(collection) {
+  const text = JSON.stringify(collection || {});
+  const regex = /https?:\/\/\{\{\s*([^}]+?)\s*\}\}/gi;
+  const keys = new Set();
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    const key = String(match[1] || '').trim();
+    if (key) {
+      keys.add(key);
+    }
+  }
+
+  return Array.from(keys);
+}
+
+function findMissingVariableKeys(variablePayload = [], keysToCheck = []) {
+  const map = new Map();
+  variablePayload.forEach((item) => {
+    const key = String(item?.key || '').trim();
+    if (!key) {
+      return;
+    }
+    map.set(key, String(item?.value ?? '').trim());
+  });
+
+  return keysToCheck.filter((key) => {
+    return !map.has(key) || map.get(key) === '';
+  });
+}
+
+async function parseRuntimeEnvironmentFile() {
+  const runtimeFile = runtimeEnvFileInput?.files && runtimeEnvFileInput.files[0];
+  if (!runtimeFile) {
+    return null;
   }
 
   const fileText = await runtimeFile.text();
@@ -361,25 +418,21 @@ async function buildRuntimeEnvironmentVariablesPayload() {
     throw new Error('Invalid Environment JSON file. Please provide valid JSON.');
   }
 
-  const importedPayload = normalizeVariableItems(parsed).map((item) => ({
+  const payload = normalizeVariableItems(parsed).map((item) => ({
     key: item.key.trim(),
     value: item.value,
     description: String(item.description || ''),
     type: item.type === 'secret' ? 'secret' : 'string'
   }));
 
-  if (!importedPayload.length) {
+  if (!payload.length) {
     throw new Error('Environment JSON file does not contain any valid variable keys.');
   }
 
-  const collisions = countCollisions(runtimePayload, importedPayload);
-  runtimePayload = mergePayloadVariables(runtimePayload, importedPayload);
-  if (collisions > 0) {
-    updateRuntimeEnvStatus(`${runtimeFile.name} selected. ${collisions} key(s) override current environment values.`, true);
-  } else {
-    updateRuntimeEnvStatus(`${runtimeFile.name} selected. No key overrides detected.`);
-  }
-  return runtimePayload;
+  return {
+    fileName: runtimeFile.name,
+    payload
+  };
 }
 
 function renderVariablesTable(scope) {
@@ -861,13 +914,28 @@ document.getElementById('run-selected').addEventListener('click', async () => {
     return;
   }
 
+  if (!collectionFile.files[0]) {
+    alert('Please upload a collection file first.');
+    return;
+  }
+
   const formData = new FormData();
   formData.append('collection', collectionFile.files[0]);
   if (dataFile.files[0]) formData.append('dataFile', dataFile.files[0]);
   formData.append('selectedIds', JSON.stringify(selectedIds));
-  formData.append('collectionVariables', JSON.stringify(toCollectionVariablesPayload()));
+  const collectionVariablesPayload = toCollectionVariablesPayload();
+  formData.append('collectionVariables', JSON.stringify(collectionVariablesPayload));
   try {
     const runtimeEnvironmentVariables = await buildRuntimeEnvironmentVariablesPayload();
+    const mergedVariablesPayload = mergePayloadVariables(collectionVariablesPayload, runtimeEnvironmentVariables);
+    const hostVariableKeys = getHostPlaceholderKeysFromCollection(collectionData);
+    const missingHostVariables = findMissingVariableKeys(mergedVariablesPayload, hostVariableKeys);
+
+    if (missingHostVariables.length > 0) {
+      alert(`Missing required host variable value(s): ${missingHostVariables.join(', ')}. Please set them before running.`);
+      return;
+    }
+
     formData.append('environmentVariables', JSON.stringify(runtimeEnvironmentVariables));
   } catch (error) {
     alert(error.message || 'Invalid environment variables input.');
@@ -1215,7 +1283,31 @@ if (exportEnvVariablesBtn) {
   });
 }
 
+if (runtimeEnvFileInput) {
+  runtimeEnvFileInput.addEventListener('change', async () => {
+    const file = runtimeEnvFileInput.files && runtimeEnvFileInput.files[0];
+    if (!file) {
+      updateRuntimeEnvStatus('No environment file selected.');
+      return;
+    }
+
+    try {
+      const parsedRuntime = await parseRuntimeEnvironmentFile();
+      if (!parsedRuntime) {
+        updateRuntimeEnvStatus('No environment file selected.');
+        return;
+      }
+      mergeImportedVariables('environment', parsedRuntime.payload);
+      setVariablesPanelExpanded('environment', true);
+      updateRuntimeEnvStatus(`${parsedRuntime.fileName} selected and auto-populated into Environment Variables.`);
+    } catch (error) {
+      updateRuntimeEnvStatus('Invalid environment file selected.', true);
+    }
+  });
+}
+
 setVariablesPanelExpanded('collection', false);
 setVariablesPanelExpanded('environment', false);
 renderVariablesTable('collection');
 renderVariablesTable('environment');
+updateRuntimeEnvStatus('No environment file selected.');
