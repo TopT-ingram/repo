@@ -15,6 +15,19 @@ const variableSearchInput = document.getElementById('variable-search');
 const importVariablesBtn = document.getElementById('import-variables');
 const exportVariablesBtn = document.getElementById('export-variables');
 const variablesImportFile = document.getElementById('variables-import-file');
+const toggleEnvVariablesBtn = document.getElementById('toggle-env-variables');
+const envVariablesPanel = document.getElementById('env-variables-panel');
+const envVariablesToggleIcon = document.getElementById('env-variables-toggle-icon');
+const envVariablesTitle = document.getElementById('env-variables-title');
+const envVariablesTableBody = document.getElementById('env-variables-table-body');
+const envVariablesEmptyState = document.getElementById('env-variables-empty-state');
+const addEnvVariableBtn = document.getElementById('add-env-variable');
+const envVariableSearchInput = document.getElementById('env-variable-search');
+const importEnvVariablesBtn = document.getElementById('import-env-variables');
+const exportEnvVariablesBtn = document.getElementById('export-env-variables');
+const envVariablesImportFile = document.getElementById('env-variables-import-file');
+const runtimeEnvFileInput = document.getElementById('runtime-env-file');
+const runtimeEnvStatus = document.getElementById('runtime-env-status');
 
 let allRequests = [];
 let collectionData = null;
@@ -22,7 +35,35 @@ let selectedRequest = null;
 const folderToRequests = new Map();
 const requestToFolders = new Map();
 let collectionVariables = [];
+let environmentVariables = [];
 let variableIdCounter = 1;
+
+const variableScopes = {
+  collection: {
+    label: 'Collection Variables',
+    panel: variablesPanel,
+    toggleButton: toggleVariablesBtn,
+    toggleIcon: variablesToggleIcon,
+    title: variablesTitle,
+    tableBody: variablesTableBody,
+    emptyState: variablesEmptyState,
+    searchInput: variableSearchInput,
+    emptyBaseText: 'No collection variables found.<br>Click "Add Variable" to create one.',
+    exportFileName: 'collection-variables.json'
+  },
+  environment: {
+    label: 'Environment Variables',
+    panel: envVariablesPanel,
+    toggleButton: toggleEnvVariablesBtn,
+    toggleIcon: envVariablesToggleIcon,
+    title: envVariablesTitle,
+    tableBody: envVariablesTableBody,
+    emptyState: envVariablesEmptyState,
+    searchInput: envVariableSearchInput,
+    emptyBaseText: 'No environment variables found.<br>Click "Add Variable" to create one.',
+    exportFileName: 'environment-variables.json'
+  }
+};
 
 function createVariable(overrides = {}) {
   return {
@@ -36,76 +77,100 @@ function createVariable(overrides = {}) {
   };
 }
 
-function setVariablesPanelExpanded(expanded) {
-  if (!variablesPanel || !toggleVariablesBtn || !variablesToggleIcon) {
+function getScopeConfig(scope) {
+  return variableScopes[scope] || variableScopes.collection;
+}
+
+function getVariablesForScope(scope) {
+  return scope === 'environment' ? environmentVariables : collectionVariables;
+}
+
+function setVariablesForScope(scope, values) {
+  if (scope === 'environment') {
+    environmentVariables = values;
+  } else {
+    collectionVariables = values;
+  }
+}
+
+function setVariablesPanelExpanded(scope, expanded) {
+  const config = getScopeConfig(scope);
+  if (!config.panel || !config.toggleButton || !config.toggleIcon) {
     return;
   }
 
   if (expanded) {
-    variablesPanel.classList.remove('collapsed');
-    toggleVariablesBtn.setAttribute('aria-expanded', 'true');
-    variablesToggleIcon.textContent = '-';
+    config.panel.classList.remove('collapsed');
+    config.toggleButton.setAttribute('aria-expanded', 'true');
+    config.toggleIcon.textContent = '-';
   } else {
-    variablesPanel.classList.add('collapsed');
-    toggleVariablesBtn.setAttribute('aria-expanded', 'false');
-    variablesToggleIcon.textContent = '+';
+    config.panel.classList.add('collapsed');
+    config.toggleButton.setAttribute('aria-expanded', 'false');
+    config.toggleIcon.textContent = '+';
   }
 }
 
-function updateVariablesHeader() {
-  if (variablesTitle) {
-    variablesTitle.textContent = `Collection Variables (${collectionVariables.length})`;
+function updateVariablesHeader(scope) {
+  const config = getScopeConfig(scope);
+  if (config.title) {
+    config.title.textContent = `${config.label} (${getVariablesForScope(scope).length})`;
   }
 }
 
-function getFilteredVariables() {
-  const keyword = (variableSearchInput?.value || '').trim().toLowerCase();
+function getFilteredVariables(scope) {
+  const config = getScopeConfig(scope);
+  const variables = getVariablesForScope(scope);
+  const keyword = (config.searchInput?.value || '').trim().toLowerCase();
   if (!keyword) {
-    return collectionVariables;
+    return variables;
   }
 
-  return collectionVariables.filter((item) => {
+  return variables.filter((item) => {
     return [item.key, item.value, item.description].some((field) => String(field || '').toLowerCase().includes(keyword));
   });
 }
 
-function moveVariable(id, direction) {
-  const index = collectionVariables.findIndex((item) => item.id === id);
+function moveVariable(scope, id, direction) {
+  const variables = getVariablesForScope(scope);
+  const index = variables.findIndex((item) => item.id === id);
   if (index < 0) {
     return;
   }
 
   const nextIndex = index + direction;
-  if (nextIndex < 0 || nextIndex >= collectionVariables.length) {
+  if (nextIndex < 0 || nextIndex >= variables.length) {
     return;
   }
 
-  const temp = collectionVariables[index];
-  collectionVariables[index] = collectionVariables[nextIndex];
-  collectionVariables[nextIndex] = temp;
-  renderVariablesTable();
+  const temp = variables[index];
+  variables[index] = variables[nextIndex];
+  variables[nextIndex] = temp;
+  renderVariablesTable(scope);
 }
 
-function removeVariable(id) {
-  collectionVariables = collectionVariables.filter((item) => item.id !== id);
-  renderVariablesTable();
+function removeVariable(scope, id) {
+  const variables = getVariablesForScope(scope).filter((item) => item.id !== id);
+  setVariablesForScope(scope, variables);
+  renderVariablesTable(scope);
 }
 
-function addVariableRow(defaults = {}) {
-  collectionVariables.push(createVariable(defaults));
-  renderVariablesTable();
+function addVariableRow(scope, defaults = {}) {
+  const variables = getVariablesForScope(scope);
+  variables.push(createVariable(defaults));
+  renderVariablesTable(scope);
 
-  setVariablesPanelExpanded(true);
+  setVariablesPanelExpanded(scope, true);
 
-  const lastId = collectionVariables[collectionVariables.length - 1]?.id;
-  const nameInput = variablesTableBody.querySelector(`tr[data-id="${lastId}"] input[data-field="key"]`);
+  const config = getScopeConfig(scope);
+  const lastId = variables[variables.length - 1]?.id;
+  const nameInput = config.tableBody?.querySelector(`tr[data-id="${lastId}"] input[data-field="key"]`);
   if (nameInput) {
     nameInput.focus();
   }
 }
 
-function toCollectionVariablesPayload() {
-  return collectionVariables
+function toVariablesPayload(scope) {
+  return getVariablesForScope(scope)
     .filter((item) => item.key && String(item.key).trim())
     .map((item) => ({
       key: String(item.key).trim(),
@@ -113,6 +178,14 @@ function toCollectionVariablesPayload() {
       description: item.description == null ? '' : String(item.description),
       type: item.secret ? 'secret' : 'string'
     }));
+}
+
+function toCollectionVariablesPayload() {
+  return toVariablesPayload('collection');
+}
+
+function toEnvironmentVariablesPayload() {
+  return toVariablesPayload('environment');
 }
 
 function parseCollectionVariables(value) {
@@ -128,11 +201,80 @@ function parseCollectionVariables(value) {
     return value.variable;
   }
 
+  // Support Postman environment export format where variables are under `values`.
+  if (typeof value === 'object' && Array.isArray(value.values)) {
+    return value.values;
+  }
+
   if (typeof value === 'object') {
     return Object.entries(value).map(([key, val]) => ({ key, value: val }));
   }
 
   return [];
+}
+
+function normalizeVariableItems(value) {
+  return parseCollectionVariables(value).map((item) => ({
+    key: item?.key == null ? '' : String(item.key),
+    value: item?.value == null ? '' : String(item.value),
+    description: item?.description?.content || item?.description || '',
+    type: String(item?.type || '').toLowerCase(),
+    enabled: item?.enabled !== false
+  })).filter((item) => item.key.trim() && item.enabled);
+}
+
+function mergePayloadVariables(basePayload, overridePayload) {
+  const merged = [];
+  const indexByKey = new Map();
+
+  [...basePayload, ...overridePayload].forEach((item) => {
+    const key = item?.key == null ? '' : String(item.key).trim();
+    if (!key) {
+      return;
+    }
+
+    const normalized = {
+      key,
+      value: item?.value == null ? '' : String(item.value),
+      description: item?.description == null ? '' : String(item.description),
+      type: String(item?.type || 'string').toLowerCase() === 'secret' ? 'secret' : 'string'
+    };
+
+    if (indexByKey.has(key)) {
+      merged[indexByKey.get(key)] = {
+        ...merged[indexByKey.get(key)],
+        ...normalized
+      };
+    } else {
+      indexByKey.set(key, merged.length);
+      merged.push(normalized);
+    }
+  });
+
+  return merged;
+}
+
+function countCollisions(basePayload, overridePayload) {
+  const existingKeys = new Set(basePayload.map((item) => String(item.key || '').trim()).filter(Boolean));
+  let collisions = 0;
+  overridePayload.forEach((item) => {
+    const key = String(item?.key || '').trim();
+    if (!key) {
+      return;
+    }
+    if (existingKeys.has(key)) {
+      collisions += 1;
+    }
+  });
+  return collisions;
+}
+
+function updateRuntimeEnvStatus(message, isWarning = false) {
+  if (!runtimeEnvStatus) {
+    return;
+  }
+  runtimeEnvStatus.textContent = message;
+  runtimeEnvStatus.style.color = isWarning ? '#b45309' : '#475569';
 }
 
 function loadCollectionVariablesFromCollection(collection) {
@@ -153,28 +295,30 @@ function loadCollectionVariablesFromCollection(collection) {
   });
 
   collectionVariables = parsed;
-  renderVariablesTable();
+  renderVariablesTable('collection');
 
   if (parsed.length > 0) {
-    setVariablesPanelExpanded(true);
+    setVariablesPanelExpanded('collection', true);
   }
 }
 
-function mergeImportedVariables(importedVars) {
-  const incoming = parseCollectionVariables(importedVars).map((item) => ({
-    key: item?.key == null ? '' : String(item.key),
-    value: item?.value == null ? '' : String(item.value),
-    description: item?.description?.content || item?.description || '',
-    type: String(item?.type || '').toLowerCase()
-  })).filter((item) => item.key.trim());
+function mergeImportedVariables(scope, importedVars) {
+  const incoming = normalizeVariableItems(importedVars);
 
   if (!incoming.length) {
     return;
   }
 
+  const variables = getVariablesForScope(scope);
+  const existingPayload = toVariablesPayload(scope);
+  const collisions = countCollisions(existingPayload, incoming);
+  let added = 0;
+  let updated = 0;
+
   incoming.forEach((entry) => {
-    const existing = collectionVariables.find((item) => String(item.key).trim() === entry.key.trim());
+    const existing = variables.find((item) => String(item.key).trim() === entry.key.trim());
     if (existing) {
+      updated += 1;
       existing.value = entry.value;
       existing.description = String(entry.description || '');
       existing.secret = entry.type === 'secret' ? true : existing.secret;
@@ -182,8 +326,9 @@ function mergeImportedVariables(importedVars) {
         existing.showValue = true;
       }
     } else {
+      added += 1;
       const secret = entry.type === 'secret';
-      collectionVariables.push(createVariable({
+      variables.push(createVariable({
         key: entry.key,
         value: entry.value,
         description: String(entry.description || ''),
@@ -193,17 +338,112 @@ function mergeImportedVariables(importedVars) {
     }
   });
 
-  renderVariablesTable();
-  setVariablesPanelExpanded(true);
+  renderVariablesTable(scope);
+  setVariablesPanelExpanded(scope, true);
+
+  const scopeLabel = scope === 'environment' ? 'Environment' : 'Collection';
+  const summary = `${scopeLabel} import completed: ${added} added, ${updated} updated.`;
+  if (collisions > 0) {
+    alert(`${summary} ${collisions} key(s) were overridden.`);
+  } else {
+    alert(summary);
+  }
 }
 
-function renderVariablesTable() {
-  if (!variablesTableBody || !variablesEmptyState) {
+async function buildRuntimeEnvironmentVariablesPayload() {
+  let runtimePayload = toEnvironmentVariablesPayload();
+  const parsedRuntime = await parseRuntimeEnvironmentFile();
+  if (!parsedRuntime) {
+    updateRuntimeEnvStatus('No environment file selected.');
+    return runtimePayload;
+  }
+
+  const nonEmptyRuntimePayload = parsedRuntime.payload.filter((item) => String(item?.value ?? '').trim() !== '');
+  const ignoredEmptyCount = parsedRuntime.payload.length - nonEmptyRuntimePayload.length;
+
+  const collisions = countCollisions(runtimePayload, nonEmptyRuntimePayload);
+  runtimePayload = mergePayloadVariables(runtimePayload, nonEmptyRuntimePayload);
+  if (collisions > 0) {
+    const ignoredText = ignoredEmptyCount > 0 ? ` ${ignoredEmptyCount} empty value(s) ignored.` : '';
+    updateRuntimeEnvStatus(`${parsedRuntime.fileName} selected. ${collisions} key(s) override current environment values.${ignoredText}`, true);
+  } else {
+    const ignoredText = ignoredEmptyCount > 0 ? ` ${ignoredEmptyCount} empty value(s) ignored.` : '';
+    updateRuntimeEnvStatus(`${parsedRuntime.fileName} selected. No key overrides detected.${ignoredText}`);
+  }
+  return runtimePayload;
+}
+
+function getHostPlaceholderKeysFromCollection(collection) {
+  const text = JSON.stringify(collection || {});
+  const regex = /https?:\/\/\{\{\s*([^}]+?)\s*\}\}/gi;
+  const keys = new Set();
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    const key = String(match[1] || '').trim();
+    if (key) {
+      keys.add(key);
+    }
+  }
+
+  return Array.from(keys);
+}
+
+function findMissingVariableKeys(variablePayload = [], keysToCheck = []) {
+  const map = new Map();
+  variablePayload.forEach((item) => {
+    const key = String(item?.key || '').trim();
+    if (!key) {
+      return;
+    }
+    map.set(key, String(item?.value ?? '').trim());
+  });
+
+  return keysToCheck.filter((key) => {
+    return !map.has(key) || map.get(key) === '';
+  });
+}
+
+async function parseRuntimeEnvironmentFile() {
+  const runtimeFile = runtimeEnvFileInput?.files && runtimeEnvFileInput.files[0];
+  if (!runtimeFile) {
+    return null;
+  }
+
+  const fileText = await runtimeFile.text();
+  let parsed;
+  try {
+    parsed = JSON.parse(fileText);
+  } catch (error) {
+    throw new Error('Invalid Environment JSON file. Please provide valid JSON.');
+  }
+
+  const payload = normalizeVariableItems(parsed).map((item) => ({
+    key: item.key.trim(),
+    value: item.value,
+    description: String(item.description || ''),
+    type: item.type === 'secret' ? 'secret' : 'string'
+  }));
+
+  if (!payload.length) {
+    throw new Error('Environment JSON file does not contain any valid variable keys.');
+  }
+
+  return {
+    fileName: runtimeFile.name,
+    payload
+  };
+}
+
+function renderVariablesTable(scope) {
+  const config = getScopeConfig(scope);
+  if (!config.tableBody || !config.emptyState) {
     return;
   }
 
-  const filtered = getFilteredVariables();
-  variablesTableBody.innerHTML = '';
+  const variables = getVariablesForScope(scope);
+  const filtered = getFilteredVariables(scope);
+  config.tableBody.innerHTML = '';
 
   filtered.forEach((item) => {
     const row = document.createElement('tr');
@@ -217,7 +457,7 @@ function renderVariablesTable() {
     nameInput.dataset.field = 'key';
     nameInput.addEventListener('input', (event) => {
       item.key = event.target.value;
-      updateVariablesHeader();
+      updateVariablesHeader(scope);
     });
     nameCell.appendChild(nameInput);
 
@@ -255,7 +495,7 @@ function renderVariablesTable() {
       } else {
         item.showValue = false;
       }
-      renderVariablesTable();
+      renderVariablesTable(scope);
     });
     secretCell.appendChild(secretToggle);
 
@@ -269,7 +509,7 @@ function renderVariablesTable() {
     showHideBtn.textContent = item.secret && !item.showValue ? 'Show' : 'Hide';
     showHideBtn.addEventListener('click', () => {
       item.showValue = !item.showValue;
-      renderVariablesTable();
+      renderVariablesTable(scope);
     });
 
     const copyBtn = document.createElement('button');
@@ -288,19 +528,19 @@ function renderVariablesTable() {
     upBtn.type = 'button';
     upBtn.className = 'mini-btn';
     upBtn.textContent = '↑';
-    upBtn.addEventListener('click', () => moveVariable(item.id, -1));
+    upBtn.addEventListener('click', () => moveVariable(scope, item.id, -1));
 
     const downBtn = document.createElement('button');
     downBtn.type = 'button';
     downBtn.className = 'mini-btn';
     downBtn.textContent = '↓';
-    downBtn.addEventListener('click', () => moveVariable(item.id, 1));
+    downBtn.addEventListener('click', () => moveVariable(scope, item.id, 1));
 
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'mini-btn danger';
     deleteBtn.textContent = 'Delete';
-    deleteBtn.addEventListener('click', () => removeVariable(item.id));
+    deleteBtn.addEventListener('click', () => removeVariable(scope, item.id));
 
     actions.appendChild(showHideBtn);
     actions.appendChild(copyBtn);
@@ -313,7 +553,7 @@ function renderVariablesTable() {
       input.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
           event.preventDefault();
-          addVariableRow();
+          addVariableRow(scope);
         }
       });
     });
@@ -323,21 +563,21 @@ function renderVariablesTable() {
     row.appendChild(descriptionCell);
     row.appendChild(secretCell);
     row.appendChild(actionsCell);
-    variablesTableBody.appendChild(row);
+    config.tableBody.appendChild(row);
   });
 
   if (!filtered.length) {
-    variablesEmptyState.style.display = 'block';
-    if (collectionVariables.length) {
-      variablesEmptyState.innerHTML = 'No variables match your search.';
+    config.emptyState.style.display = 'block';
+    if (variables.length) {
+      config.emptyState.innerHTML = 'No variables match your search.';
     } else {
-      variablesEmptyState.innerHTML = 'No collection variables found.<br>Click "Add Variable" to create one.';
+      config.emptyState.innerHTML = config.emptyBaseText;
     }
   } else {
-    variablesEmptyState.style.display = 'none';
+    config.emptyState.style.display = 'none';
   }
 
-  updateVariablesHeader();
+  updateVariablesHeader(scope);
 }
 
 function ensureRequestAncestors(requestId, folderId) {
@@ -413,6 +653,7 @@ function buildTree(items, container, prefix = []) {
       folderCheckbox.className = 'folder-checkbox';
       folderCheckbox.dataset.id = id;
       folderCheckbox.style.marginRight = '8px';
+      folderCheckbox.checked = true; // Select folder by default
 
       const label = document.createElement('span');
       label.textContent = item.name || 'Folder';
@@ -439,6 +680,7 @@ function buildTree(items, container, prefix = []) {
       checkbox.className = 'request-checkbox';
       checkbox.dataset.id = id;
       checkbox.style.marginRight = '8px';
+      checkbox.checked = true; // Select request by default
 
       const text = document.createElement('span');
       text.textContent = `${item.request?.method || 'GET'}: ${item.name}`;
@@ -674,11 +916,33 @@ document.getElementById('run-selected').addEventListener('click', async () => {
     return;
   }
 
+  if (!collectionFile.files[0]) {
+    alert('Please upload a collection file first.');
+    return;
+  }
+
   const formData = new FormData();
   formData.append('collection', collectionFile.files[0]);
   if (dataFile.files[0]) formData.append('dataFile', dataFile.files[0]);
   formData.append('selectedIds', JSON.stringify(selectedIds));
-  formData.append('collectionVariables', JSON.stringify(toCollectionVariablesPayload()));
+  const collectionVariablesPayload = toCollectionVariablesPayload();
+  formData.append('collectionVariables', JSON.stringify(collectionVariablesPayload));
+  try {
+    const runtimeEnvironmentVariables = await buildRuntimeEnvironmentVariablesPayload();
+    const mergedVariablesPayload = mergePayloadVariables(collectionVariablesPayload, runtimeEnvironmentVariables);
+    const hostVariableKeys = getHostPlaceholderKeysFromCollection(collectionData);
+    const missingHostVariables = findMissingVariableKeys(mergedVariablesPayload, hostVariableKeys);
+
+    if (missingHostVariables.length > 0) {
+      alert(`Missing required host variable value(s): ${missingHostVariables.join(', ')}. Please set them before running.`);
+      return;
+    }
+
+    formData.append('environmentVariables', JSON.stringify(runtimeEnvironmentVariables));
+  } catch (error) {
+    alert(error.message || 'Invalid environment variables input.');
+    return;
+  }
   if (selectedIterations !== null) {
     formData.append('selectedIterations', JSON.stringify(selectedIterations));
   }
@@ -867,6 +1131,13 @@ document.getElementById('send-request').addEventListener('click', async () => {
   if (dataFile.files[0]) formData.append('dataFile', dataFile.files[0]);
   formData.append('selectedIds', JSON.stringify([selectedRequest.id]));
   formData.append('collectionVariables', JSON.stringify(toCollectionVariablesPayload()));
+  try {
+    const runtimeEnvironmentVariables = await buildRuntimeEnvironmentVariablesPayload();
+    formData.append('environmentVariables', JSON.stringify(runtimeEnvironmentVariables));
+  } catch (error) {
+    alert(error.message || 'Invalid environment variables input.');
+    return;
+  }
   if (selectedIterations !== null) {
     formData.append('selectedIterations', JSON.stringify(selectedIterations));
   }
@@ -915,16 +1186,16 @@ document.getElementById('unselect-all').addEventListener('click', () => {
 if (toggleVariablesBtn) {
   toggleVariablesBtn.addEventListener('click', () => {
     const expanded = toggleVariablesBtn.getAttribute('aria-expanded') === 'true';
-    setVariablesPanelExpanded(!expanded);
+    setVariablesPanelExpanded('collection', !expanded);
   });
 }
 
 if (addVariableBtn) {
-  addVariableBtn.addEventListener('click', () => addVariableRow());
+  addVariableBtn.addEventListener('click', () => addVariableRow('collection'));
 }
 
 if (variableSearchInput) {
-  variableSearchInput.addEventListener('input', () => renderVariablesTable());
+  variableSearchInput.addEventListener('input', () => renderVariablesTable('collection'));
 }
 
 if (importVariablesBtn && variablesImportFile) {
@@ -941,7 +1212,7 @@ if (importVariablesBtn && variablesImportFile) {
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
-      mergeImportedVariables(parsed);
+      mergeImportedVariables('collection', parsed);
     } catch (error) {
       alert('Invalid variable JSON file.');
     } finally {
@@ -963,5 +1234,82 @@ if (exportVariablesBtn) {
   });
 }
 
-setVariablesPanelExpanded(false);
-renderVariablesTable();
+if (toggleEnvVariablesBtn) {
+  toggleEnvVariablesBtn.addEventListener('click', () => {
+    const expanded = toggleEnvVariablesBtn.getAttribute('aria-expanded') === 'true';
+    setVariablesPanelExpanded('environment', !expanded);
+  });
+}
+
+if (addEnvVariableBtn) {
+  addEnvVariableBtn.addEventListener('click', () => addVariableRow('environment'));
+}
+
+if (envVariableSearchInput) {
+  envVariableSearchInput.addEventListener('input', () => renderVariablesTable('environment'));
+}
+
+if (importEnvVariablesBtn && envVariablesImportFile) {
+  importEnvVariablesBtn.addEventListener('click', () => {
+    envVariablesImportFile.click();
+  });
+
+  envVariablesImportFile.addEventListener('change', async () => {
+    const file = envVariablesImportFile.files && envVariablesImportFile.files[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      mergeImportedVariables('environment', parsed);
+    } catch (error) {
+      alert('Invalid environment variable JSON file.');
+    } finally {
+      envVariablesImportFile.value = '';
+    }
+  });
+}
+
+if (exportEnvVariablesBtn) {
+  exportEnvVariablesBtn.addEventListener('click', () => {
+    const exportPayload = toEnvironmentVariablesPayload();
+    const data = JSON.stringify(exportPayload, null, 2);
+    const anchor = document.createElement('a');
+    anchor.href = `data:application/json;charset=utf-8,${encodeURIComponent(data)}`;
+    anchor.download = 'environment-variables.json';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+  });
+}
+
+if (runtimeEnvFileInput) {
+  runtimeEnvFileInput.addEventListener('change', async () => {
+    const file = runtimeEnvFileInput.files && runtimeEnvFileInput.files[0];
+    if (!file) {
+      updateRuntimeEnvStatus('No environment file selected.');
+      return;
+    }
+
+    try {
+      const parsedRuntime = await parseRuntimeEnvironmentFile();
+      if (!parsedRuntime) {
+        updateRuntimeEnvStatus('No environment file selected.');
+        return;
+      }
+      mergeImportedVariables('environment', parsedRuntime.payload);
+      setVariablesPanelExpanded('environment', true);
+      updateRuntimeEnvStatus(`${parsedRuntime.fileName} selected and auto-populated into Environment Variables.`);
+    } catch (error) {
+      updateRuntimeEnvStatus('Invalid environment file selected.', true);
+    }
+  });
+}
+
+setVariablesPanelExpanded('collection', false);
+setVariablesPanelExpanded('environment', false);
+renderVariablesTable('collection');
+renderVariablesTable('environment');
+updateRuntimeEnvStatus('No environment file selected.');

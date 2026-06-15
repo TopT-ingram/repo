@@ -7,49 +7,50 @@
   <style>
     .postman-layout {
       display: flex;
-      height: calc(100vh - 280px);
+      height: calc(100vh - 380px);
     }
     .upper-controls {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
       padding: 15px;
       background: #f9f9f9;
       border-bottom: 1px solid #ddd;
-      align-items: flex-start;
+      max-height: none;
+      overflow: visible;
     }
     #collection-form {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 20px;
+      gap: 12px;
+      flex: 1;
     }
     .form-group {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
     }
     .form-group label {
-      font-weight: bold;
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #0f172a;
     }
     .form-group input {
       padding: 8px;
       border: 1px solid #ddd;
       border-radius: 4px;
-    }
-    .controls-group {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+      font-size: 0.9rem;
     }
     .primary-btn {
-      padding: 10px 20px;
+      padding: 10px 16px;
       background: #4CAF50;
       color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      font-weight: bold;
-      min-width: 180px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: background 0.2s;
     }
     .primary-btn:hover {
       background: #45a049;
@@ -57,16 +58,20 @@
     .selection-controls {
       display: flex;
       gap: 8px;
+      flex: 1;
+      min-width: 200px;
     }
     .secondary-btn {
-      padding: 8px 16px;
+      padding: 8px 12px;
       background: #2196F3;
       color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
+      font-weight: 500;
       flex: 1;
+      transition: background 0.2s;
     }
     .secondary-btn:hover {
       background: #0b7dda;
@@ -366,29 +371,137 @@
       background: #e3f2fd;
       border-color: #90caf9;
     }
+    .files-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+    .file-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .file-group label {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #0f172a;
+    }
+    .file-group input[type="file"],
+    .file-group small {
+      font-size: 0.88rem;
+    }
+    .file-group small {
+      color: #64748b;
+      line-height: 1.3;
+    }
+    .files-row-full {
+      grid-column: 1 / -1;
+    }
+    .variables-wrapper {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin: 15px 0;
+    }
+    .footer-controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: #f9f9f9;
+      padding-top: 4px;
+    }
+    .selection-help {
+      width: 100%;
+      margin-top: 6px;
+      color: #475569;
+      font-size: 0.86rem;
+      line-height: 1.35;
+    }
+    .footer-controls .primary-btn {
+      min-width: 160px;
+      height: 38px;
+    }
+    .footer-controls .selection-controls {
+      display: flex;
+      gap: 8px;
+      flex: 1;
+      min-width: 220px;
+    }
+    .footer-controls .secondary-btn {
+      height: 38px;
+    }
+    @media (max-width: 1400px) {
+      .files-section {
+        grid-template-columns: 1fr;
+      }
+      .variables-wrapper {
+        grid-template-columns: 1fr;
+      }
+    }
     @media (max-width: 900px) {
       .variables-table {
         min-width: 680px;
+      }
+      .upper-controls {
+        grid-template-columns: 1fr !important;
+      }
+      #collection-form {
+        grid-template-columns: 1fr !important;
       }
     }
   </style>
 </head>
 <body>
   <h1>Postman Collection Runner</h1>
-
-  <div class="utility-card">
-    <p>Upload a Postman collection and Excel/JSON iteration data. Select requests to edit and run.</p>
-    <a class="utility-link" href="/" target="_self">Back to API Test Runner</a>
-  </div>
+  <p style="margin: 4px 0 12px; color: #475569; font-size: 0.92rem;">Upload files, review selections, and run only the requests you need.</p>
 
   <div class="upper-controls">
+    <!-- TOP CONTROLS: RUN & SELECT BUTTONS -->
+    <div class="footer-controls" style="order: -1; border-bottom: 1px solid #ddd; padding-bottom: 12px; margin-bottom: 6px;">
+      <button id="run-selected" class="primary-btn">Run Selected Request</button>
+      <div class="selection-controls">
+        <button id="select-all" class="secondary-btn">Select All Requests</button>
+        <button id="unselect-all" class="secondary-btn">Deselect All Requests</button>
+      </div>
+      <div class="selection-help">Use request checkboxes in the left panel to choose exactly what to run.</div>
+    </div>
+
     <form id="collection-form">
-      <div class="form-group">
-        <label><b>Postman Collection JSON</b></label><br>
-        <input type="file" id="collection-file" accept="application/json" required /><br>
+      <!-- COLLECTION FILE -->
+      <div class="file-group files-row-full">
+        <label><b>📋 Postman Collection JSON</b></label>
+        <input type="file" id="collection-file" accept="application/json" required />
       </div>
 
-      <div class="form-group variables-group">
+      <!-- TEST DATA & ENVIRONMENT FILES SIDE BY SIDE -->
+      <div class="files-section">
+        <div class="file-group">
+          <label><b>📊 Test Data (Excel, CSV, JSON)</b></label>
+          <input type="file" id="data-file" name="dataFile" accept=".xlsx,.xls,.csv,.json" />
+          <small>Optional. Provides iteration rows for parameterized execution.</small>
+        </div>
+        <div class="file-group">
+          <label><b>⚙️ Environment JSON</b></label>
+          <input type="file" id="runtime-env-file" accept="application/json" />
+          <small id="runtime-env-status" style="color:#475569;">No environment file selected.</small>
+        </div>
+      </div>
+
+      <!-- ITERATION SELECTOR -->
+      <div class="form-group" id="iteration-selector-group" style="display:none;">
+        <label><b>Iteration Selection</b></label>
+        <div class="iteration-selector-wrap">
+          <div id="iteration-selector-content"></div>
+        </div>
+      </div>
+
+      <!-- VARIABLES PANELS AT BOTTOM (COLLAPSED BY DEFAULT) -->
+      <div class="variables-wrapper">
         <div class="variables-card">
           <button type="button" id="toggle-variables" class="variables-header" aria-expanded="false">
             <span id="variables-title">Collection Variables (0)</span>
@@ -396,12 +509,11 @@
           </button>
           <div id="variables-panel" class="variables-panel collapsed">
             <div class="variables-toolbar">
-              <input type="text" id="variable-search" class="variables-search" placeholder="Search variables by name, value, or description" />
+              <input type="text" id="variable-search" class="variables-search" placeholder="Search variables..." />
               <button type="button" id="import-variables" class="mini-btn">Import JSON</button>
               <button type="button" id="export-variables" class="mini-btn">Export JSON</button>
               <input type="file" id="variables-import-file" accept="application/json" style="display:none;" />
             </div>
-
             <div class="variables-table-wrap">
               <table class="variables-table" aria-label="Collection variables">
                 <thead>
@@ -416,37 +528,47 @@
                 <tbody id="variables-table-body"></tbody>
               </table>
             </div>
-
             <div id="variables-empty-state" class="variables-empty">
-              No collection variables found.<br>
-              Click "Add Variable" to create one.
+              No collection variables found.<br>Click "Add Variable" to create one.
             </div>
-
             <button type="button" id="add-variable" class="add-variable-btn">+ Add Variable</button>
           </div>
         </div>
-      </div>
 
-      <div class="form-group">
-        <label><b>Iteration Data (Excel, CSV, or JSON)</b></label><br>
-        <input type="file" id="data-file" name="dataFile" accept=".xlsx,.xls,.csv,.json" /><br>
-      </div>
-
-      <div class="form-group" id="iteration-selector-group" style="display:none;">
-        <label><b>Iteration Selection</b></label>
-        <div class="iteration-selector-wrap">
-          <div id="iteration-selector-content"></div>
+        <div class="variables-card">
+          <button type="button" id="toggle-env-variables" class="variables-header" aria-expanded="false">
+            <span id="env-variables-title">Environment Variables (0)</span>
+            <span id="env-variables-toggle-icon">+</span>
+          </button>
+          <div id="env-variables-panel" class="variables-panel collapsed">
+            <div class="variables-toolbar">
+              <input type="text" id="env-variable-search" class="variables-search" placeholder="Search variables..." />
+              <button type="button" id="import-env-variables" class="mini-btn">Import JSON</button>
+              <button type="button" id="export-env-variables" class="mini-btn">Export JSON</button>
+              <input type="file" id="env-variables-import-file" accept="application/json" style="display:none;" />
+            </div>
+            <div class="variables-table-wrap">
+              <table class="variables-table" aria-label="Environment variables">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Variable Name</th>
+                    <th style="width: 28%;">Value</th>
+                    <th style="width: 28%;">Description</th>
+                    <th style="width: 10%;">Secret</th>
+                    <th style="width: 14%;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="env-variables-table-body"></tbody>
+              </table>
+            </div>
+            <div id="env-variables-empty-state" class="variables-empty">
+              No environment variables found.<br>Click "Add Variable" to create one.
+            </div>
+            <button type="button" id="add-env-variable" class="add-variable-btn">+ Add Variable</button>
+          </div>
         </div>
       </div>
     </form>
-
-    <div class="controls-group">
-      <button id="run-selected" class="primary-btn">Run Selected Requests</button>
-      <div class="selection-controls">
-        <button id="select-all" class="secondary-btn">Select All</button>
-        <button id="unselect-all" class="secondary-btn">Unselect All</button>
-      </div>
-    </div>
   </div>
 
   <div class="postman-layout">
