@@ -932,8 +932,10 @@ document.getElementById('run-selected').addEventListener('click', async () => {
     const mergedVariablesPayload = mergePayloadVariables(collectionVariablesPayload, runtimeEnvironmentVariables);
     const hostVariableKeys = getHostPlaceholderKeysFromCollection(collectionData);
     const missingHostVariables = findMissingVariableKeys(mergedVariablesPayload, hostVariableKeys);
+    const hasIterationDataFile = Boolean(dataFile?.files && dataFile.files[0]);
 
-    if (missingHostVariables.length > 0) {
+    // If iteration data is provided, host values may come from row columns.
+    if (missingHostVariables.length > 0 && !hasIterationDataFile) {
       alert(`Missing required host variable value(s): ${missingHostVariables.join(', ')}. Please set them before running.`);
       return;
     }
