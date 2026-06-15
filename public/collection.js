@@ -653,6 +653,7 @@ function buildTree(items, container, prefix = []) {
       folderCheckbox.className = 'folder-checkbox';
       folderCheckbox.dataset.id = id;
       folderCheckbox.style.marginRight = '8px';
+      folderCheckbox.checked = true; // Select folder by default
 
       const label = document.createElement('span');
       label.textContent = item.name || 'Folder';
@@ -679,6 +680,7 @@ function buildTree(items, container, prefix = []) {
       checkbox.className = 'request-checkbox';
       checkbox.dataset.id = id;
       checkbox.style.marginRight = '8px';
+      checkbox.checked = true; // Select request by default
 
       const text = document.createElement('span');
       text.textContent = `${item.request?.method || 'GET'}: ${item.name}`;
