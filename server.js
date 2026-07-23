@@ -573,6 +573,7 @@ app.post('/run-selected', upload.fields([
     const runStart = Date.now();
 
     const requestResults = [];
+    const consoleLogs = [];
 
     newman.run({
       collection: runCollection,
@@ -586,6 +587,14 @@ app.post('/run-selected', upload.fields([
         htmlextra: {
           export: reportPath
         }
+      }
+    })
+    .on('console', (err, args) => {
+      if (!err && args) {
+        consoleLogs.push({
+          level: args.level || 'log',
+          messages: (args.messages || []).map((m) => (m === null || m === undefined ? '' : (typeof m === 'object' ? JSON.stringify(m) : String(m))))
+        });
       }
     })
     .on('request', (err, args) => {
@@ -644,6 +653,7 @@ app.post('/run-selected', upload.fields([
         reportUrl,
         reportExists,
         failureDetails,
+        consoleLogs,
         error: getRunErrorMessage(err)
       });
     });

@@ -968,7 +968,8 @@ document.getElementById('run-selected').addEventListener('click', async () => {
       error: data.error,
       duration: data.duration,
       reportExists: data.reportExists,
-      failureDetails: data.failureDetails
+      failureDetails: data.failureDetails,
+      consoleLogs: data.consoleLogs
     });
     
     resultsList.innerHTML = report.html;
@@ -982,8 +983,7 @@ document.getElementById('run-selected').addEventListener('click', async () => {
 });
 
 // Generate Manifest/Extent Report
-function generateManifestReport(selectedIds, results, hasIterationData, reportUrl, runMeta = {}) {
-  const totalRequests = selectedIds.length;
+function generateManifestReport(selectedIds, results, hasIterationData, reportUrl, runMeta = {}) {  const totalRequests = selectedIds.length;
   const successCount = results.filter(r => r.code >= 200 && r.code < 300).length;
   const failureCount = results.filter(r => r.code >= 400).length;
   const warningCount = results.filter(r => r.code >= 300 && r.code < 400).length;
@@ -1026,6 +1026,25 @@ function generateManifestReport(selectedIds, results, hasIterationData, reportUr
     ? `<div style="margin-top:10px; padding:10px; border:1px solid #e2e8f0; background:#f8fafc; border-radius:6px;"><strong>Top Failure Details</strong><ul style="margin:8px 0 0 18px; padding:0;">${failureDetails.map((f) => `<li><strong>${f.parent ? `${f.parent} / ` : ''}${f.source}</strong>: ${f.error}</li>`).join('')}</ul></div>`
     : '';
 
+  const consoleLogs = Array.isArray(runMeta.consoleLogs) ? runMeta.consoleLogs : [];
+  const consoleLogLines = consoleLogs.map((entry) => {
+    const level = String(entry.level || 'log').toLowerCase();
+    const prefix = level === 'warn' ? '[WARN]' : level === 'error' ? '[ERROR]' : level === 'info' ? '[INFO]' : level === 'debug' ? '[DEBUG]' : '[LOG]';
+    const msg = (entry.messages || []).join(' ');
+    const escaped = msg.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return `<div class="log-line ${level}"><span class="log-prefix">${prefix}</span>${escaped}</div>`;
+  });
+  const consoleLogHtml = `
+    <div class="console-log-section">
+      <div class="console-log-header">
+        <span>🖥 Console Log (${consoleLogs.length} message${consoleLogs.length !== 1 ? 's' : ''})</span>
+      </div>
+      <div class="console-log-body">
+        ${consoleLogLines.length ? consoleLogLines.join('') : '<div class="console-log-empty">No console output captured during execution.</div>'}
+      </div>
+    </div>
+  `;
+
   const html = `
     <div class="report-section">
       <h4>Execution Report</h4>
@@ -1055,6 +1074,7 @@ function generateManifestReport(selectedIds, results, hasIterationData, reportUr
       ${errorSummaryHtml}
       ${reportMissingHtml}
       ${failureDetailsHtml}
+      ${consoleLogHtml}
     </div>
   `;
 
@@ -1163,7 +1183,8 @@ document.getElementById('send-request').addEventListener('click', async () => {
       error: data.error,
       duration: data.duration,
       reportExists: data.reportExists,
-      failureDetails: data.failureDetails
+      failureDetails: data.failureDetails,
+      consoleLogs: data.consoleLogs
     });
     
     resultsList.innerHTML = report.html;
